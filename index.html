@@ -19,9 +19,9 @@
             --success-color: #28a745;
             --border-color: #333;
             --card-width: 280px;
-            --card-height: 160px;
+            --card-height: 185px; /* Increased height for new element */
             --card-width-large: 400px;
-            --card-height-large: 225px;
+            --card-height-large: 250px; /* Increased height for new element */
         }
 
         * {
@@ -147,12 +147,28 @@
         .map-card.is-playing .card-video { opacity: 1; }
         .map-card.is-playing .card-image { opacity: 0; }
         .map-card .card-overlay {
-            position: absolute; bottom: 0; left: 0; right: 0; height: 70%;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 100%);
+            position: absolute; bottom: 0; left: 0; right: 0; height: 80%; /* Increased height */
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 20%, rgba(0, 0, 0, 0) 100%);
             display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
+        }
+        .card-info {
+            display: flex; flex-direction: column; gap: 4px; /* Added gap for new element */
         }
         .map-card .island-title { font-size: 1.1rem; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.7); }
         .map-card .creator-slug { font-size: 0.9rem; color: var(--secondary-text-color); }
+        
+        /* New Style for Last Updated Time */
+        .map-card .last-updated-time {
+            font-size: 0.8rem;
+            color: var(--secondary-text-color);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .last-updated-time svg {
+            flex-shrink: 0;
+        }
+
         .map-card .player-count {
             position: absolute; top: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7);
             padding: 4px 8px; border-radius: 15px; font-size: 0.8rem; font-weight: 600;
@@ -198,14 +214,15 @@
 
         @media (max-width: 768px) {
             :root {
-                --card-width: 240px; --card-height: 135px;
-                --card-width-large: 100%; --card-height-large: 200px;
+                --card-width: 100%; 
+                --card-height: 200px;
+                --card-width-large: 100%;
+                --card-height-large: 225px;
             }
             main { padding: 1.5rem 4%; }
             .header-top-row, .header-bottom-row { flex-direction: column; align-items: stretch; text-align: center; }
             .last-updated { text-align: center; margin-bottom: 0.5rem; }
             #search-bar { width: 100%; }
-            .map-card, .map-card.large { width: 100%; }
             .horizontal-scroll-container {
                 -ms-overflow-style: none; /* IE and Edge */
                 scrollbar-width: none; /* Firefox */
@@ -263,6 +280,7 @@
             const userIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/></svg>`;
             const copyIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zM8 2h1v1H8zM4.5 3A1.5 1.5 0 0 1 6 1.5h4A1.5 1.5 0 0 1 11.5 3v1h-7z"/></svg>`;
             const checkIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>`;
+            const clockIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>`;
 
             const observer = new IntersectionObserver((entries, obs) => {
                 entries.forEach(entry => {
@@ -281,7 +299,6 @@
                 const now = new Date();
                 const updatedTime = new Date(timestamp);
                 const diffSeconds = Math.round((now - updatedTime) / 1000);
-
                 if (diffSeconds < 60) return `Updated just now`;
                 const diffMinutes = Math.round(diffSeconds / 60);
                 if (diffMinutes < 60) return `Updated ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
@@ -290,28 +307,48 @@
                 const diffDays = Math.round(diffHours / 24);
                 return `Updated ${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
             };
+
+            // CORRECTED function for card-specific time format including months
+            const formatRelativeTimeForCard = (timestamp) => {
+                if (!timestamp) return '';
+                const diffSeconds = Math.round((Date.now() - timestamp) / 1000);
+
+                if (diffSeconds < 60) return `< 1m`;
+                
+                const diffMinutes = Math.floor(diffSeconds / 60);
+                if (diffMinutes < 60) return `${diffMinutes}m`;
+
+                const diffHours = Math.floor(diffMinutes / 60);
+                if (diffHours < 24) return `${diffHours}h ${diffMinutes % 60}m`;
+                
+                const diffDays = Math.floor(diffHours / 24);
+                if (diffDays < 30) return `${diffDays}d ${diffHours % 24}h`;
+                
+                if (diffDays < 365) {
+                    const diffMonths = Math.floor(diffDays / 30.44); // Use average month length
+                    const remainingDays = Math.floor(diffDays % 30.44);
+                    return `${diffMonths}mo ${remainingDays}d`;
+                }
+
+                const diffYears = Math.floor(diffDays / 365);
+                const remainingMonths = Math.floor((diffDays % 365) / 30.44);
+                return `${diffYears}y ${remainingMonths}mo`;
+            };
             
             async function fetchDataAndRender() {
                 try {
                     const response = await fetch(API_URL);
                     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                     const { pageProps } = await response.json();
-                    
                     if (!pageProps) throw new Error("`pageProps` not found.");
 
                     const { topIslands, data: panels, topCreators, lastUpdated } = pageProps;
                     allMaps = panels.flatMap(panel => panel.results);
 
-                    if (lastUpdated) {
-                        lastUpdatedDiv.textContent = formatRelativeTime(lastUpdated);
-                    }
+                    if (lastUpdated) lastUpdatedDiv.textContent = formatRelativeTime(lastUpdated);
                     
-                    const mostPlayedContainer = document.getElementById('most-played-container');
-                    const panelsContainer = document.getElementById('panels-container');
-                    const topCreatorsContainer = document.getElementById('top-creators-container');
-
-                    mostPlayedContainer.innerHTML = topIslands.map(island => createMapCardHTML(island, true)).join('');
-                    panelsContainer.innerHTML = panels.map(panel => {
+                    document.getElementById('most-played-container').innerHTML = topIslands.map(island => createMapCardHTML(island, true)).join('');
+                    document.getElementById('panels-container').innerHTML = panels.map(panel => {
                         if (!panel.results || panel.results.length === 0) return '';
                         return `
                             <section class="content-section" id="panel-${panel.panelId.replace(/_/g, '-')}">
@@ -319,7 +356,7 @@
                                 <div class="horizontal-scroll-container">${panel.results.map(island => createMapCardHTML(island, false)).join('')}</div>
                             </section>`;
                     }).join('');
-                    topCreatorsContainer.innerHTML = topCreators.map(creator => `
+                    document.getElementById('top-creators-container').innerHTML = topCreators.map(creator => `
                         <div class="creator-card">
                             <img src="${creator.iconImage}" alt="${creator.creatorSlug}" class="creator-avatar" loading="lazy">
                             <div class="creator-name">${creator.creatorSlug}</div>
@@ -340,6 +377,8 @@
             function createMapCardHTML(island, isLarge = false) {
                 const hasVideo = island.videoUrl && island.videoUrl.trim() !== '';
                 const videoAttr = hasVideo ? `data-video-card="true" data-video-src="${island.videoUrl}"` : '';
+                const updatedTime = formatRelativeTimeForCard(island.lastUpdated);
+
                 return `
                     <div class="map-card ${isLarge ? 'large' : ''}" ${videoAttr}>
                         <img class="card-background card-image" src="${island.smallImage}" alt="${island.islandTitle}" loading="lazy">
@@ -347,7 +386,11 @@
                         ${island.islandRank ? `<div class="island-rank">${island.islandRank}</div>` : ''}
                         <div class="player-count">${userIconSVG}<span>${island.globalCCU.toLocaleString()}</span></div>
                         <div class="card-overlay">
-                            <div><h3 class="island-title">${island.islandTitle}</h3><p class="creator-slug">by ${island.creatorSlug}</p></div>
+                            <div class="card-info">
+                                <h3 class="island-title">${island.islandTitle}</h3>
+                                <p class="creator-slug">by ${island.creatorSlug}</p>
+                                ${updatedTime ? `<div class="last-updated-time">${clockIconSVG}<span>${updatedTime}</span></div>` : ''}
+                            </div>
                             <div class="map-code-container">
                                 <span class="map-code">${island.islandCode}</span>
                                 <button class="copy-btn" aria-label="Copy Map Code" data-code="${island.islandCode}">${copyIconSVG}</button>
@@ -409,14 +452,14 @@
                             if (videoSrc.endsWith('.m3u8') && Hls.isSupported()) {
                                 if (video.hls) video.hls.destroy();
                                 const hls = new Hls();
-                                video.hls = hls; // Attach instance to element
+                                video.hls = hls;
                                 hls.loadSource(videoSrc);
                                 hls.attachMedia(video);
                                 await video.play();
-                            } else if (video.canPlayType('application/vnd.apple.mpegurl')) { // Native HLS support (Safari)
+                            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                                 video.src = videoSrc;
                                 await video.play();
-                            } else { // Standard video formats like MP4
+                            } else {
                                 video.src = videoSrc;
                                 await video.play();
                             }
@@ -434,11 +477,9 @@
                     const video = card.querySelector('video');
                     if (video) {
                         card.classList.remove('is-playing');
-                        if (video.hls) { // If HLS.js was used, destroy the instance
-                            video.hls.destroy();
-                        }
+                        if (video.hls) video.hls.destroy();
                         video.pause();
-                        video.removeAttribute('src'); // Unload the video source to save resources
+                        video.removeAttribute('src');
                         video.load();
                     }
                 }
