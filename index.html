@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fortnite Creative Discovery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        /* --- Base & Theme --- */
+        :root {
+            --background-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-text-color: #e0e0e0;
+            --secondary-text-color: #a0a0a0;
+            --accent-color: #007bff;
+            --success-color: #28a745;
+            --border-color: #333;
+            --card-width: 280px;
+            --card-height: 160px;
+            --card-width-large: 400px;
+            --card-height-large: 225px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--primary-text-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        /* --- Accessibility --- */
+        :focus-visible {
+            outline: 3px solid var(--accent-color);
+            outline-offset: 3px;
+            border-radius: 4px;
+        }
+
+        /* --- Animations & Keyframes --- */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes drawBorder {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+        }
+        
+        /* --- Loader --- */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--background-color); display: flex; justify-content: center;
+            align-items: center; z-index: 1000; transition: opacity 0.5s ease-out;
+        }
+        #loader.fade-out { opacity: 0; }
+        .loader-dot { width: 20px; height: 20px; background-color: var(--accent-color); border-radius: 50%; animation: pulse 2s infinite; }
+
+        /* --- Header & Navigation --- */
+        header {
+            position: sticky; top: 0; z-index: 100;
+            background-color: rgba(18, 18, 18, 0.85); backdrop-filter: blur(10px);
+            padding: 1rem 5%; border-bottom: 1px solid var(--border-color);
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;
+        }
+        .header-top-row {
+            width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+        }
+        header .logo { font-size: 1.5rem; font-weight: 700; flex-shrink: 0; }
+        .last-updated { font-size: 0.8rem; color: var(--secondary-text-color); text-align: right; }
+        
+        .header-bottom-row {
+            width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+        }
+        header nav { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+        header nav::-webkit-scrollbar { display: none; }
+        header nav a {
+            color: var(--secondary-text-color); text-decoration: none; font-weight: 600;
+            padding: 0.5rem; border-radius: 5px; transition: all 0.2s; white-space: nowrap;
+        }
+        header nav a:hover { color: var(--primary-text-color); background-color: var(--surface-color); transform: translateY(-2px); }
+        
+        #search-bar {
+            padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid var(--border-color);
+            background-color: var(--surface-color); color: var(--primary-text-color);
+            font-size: 1rem; flex-grow: 1; min-width: 200px;
+        }
+
+        /* --- Main Content & Sections --- */
+        main { padding: 2rem 5%; }
+        .content-section { margin-bottom: 3rem; opacity: 0; }
+        .content-section.is-visible { animation: fadeInUp 0.8s forwards; }
+        .content-section h2 {
+            font-size: 1.8rem; margin-bottom: 1.5rem;
+            border-left: 4px solid var(--accent-color); padding-left: 10px; position: relative;
+        }
+        .content-section.is-visible h2::before {
+            content: ''; position: absolute; left: -4px; top: 0;
+            height: 100%; width: 4px; background-color: var(--accent-color);
+            transform-origin: top; animation: drawBorder 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        /* --- Horizontal Scrolling Container --- */
+        .horizontal-scroll-container {
+            display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px;
+            scrollbar-color: var(--border-color) var(--surface-color); scrollbar-width: thin;
+        }
+        .horizontal-scroll-container::-webkit-scrollbar { height: 8px; }
+        .horizontal-scroll-container::-webkit-scrollbar-track { background: var(--surface-color); border-radius: 4px; }
+        .horizontal-scroll-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        .horizontal-scroll-container::-webkit-scrollbar-thumb:hover { background: var(--secondary-text-color); }
+
+        /* --- Map Card Component --- */
+        .map-card {
+            position: relative; flex-shrink: 0;
+            width: var(--card-width); height: var(--card-height);
+            border-radius: 12px; overflow: hidden; background-color: var(--surface-color);
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease; opacity: 0;
+        }
+        .map-card.is-visible { animation: fadeInUp 0.5s forwards; }
+        .map-card:hover { transform: scale(1.05) translateY(-5px); box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3); }
+        .map-card.large { width: var(--card-width-large); height: var(--card-height-large); }
+        .map-card .card-background {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .map-card:hover .card-background { transform: scale(1.1); }
+        .map-card .card-video { opacity: 0; }
+        .map-card.is-playing .card-video { opacity: 1; }
+        .map-card.is-playing .card-image { opacity: 0; }
+        .map-card .card-overlay {
+            position: absolute; bottom: 0; left: 0; right: 0; height: 70%;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 100%);
+            display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
+        }
+        .map-card .island-title { font-size: 1.1rem; font-weight: 700; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.7); }
+        .map-card .creator-slug { font-size: 0.9rem; color: var(--secondary-text-color); }
+        .map-card .player-count {
+            position: absolute; top: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7);
+            padding: 4px 8px; border-radius: 15px; font-size: 0.8rem; font-weight: 600;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .map-card .island-rank {
+            position: absolute; top: 10px; right: 10px; background-color: var(--accent-color);
+            color: #fff; width: 30px; height: 30px; border-radius: 50%; display: flex;
+            justify-content: center; align-items: center; font-weight: 700; font-size: 1rem; border: 2px solid #fff;
+        }
+        .map-card .map-code-container {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 8px; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 5px;
+        }
+        .map-card .map-code { font-family: monospace; font-size: 0.9rem; color: var(--primary-text-color); }
+        .map-card .copy-btn {
+            background: none; border: none; color: var(--secondary-text-color); cursor: pointer;
+            padding: 4px; display: inline-flex; align-items: center; justify-content: center;
+            transition: color 0.2s, transform 0.2s;
+        }
+        .map-card .copy-btn:hover { color: #fff; }
+        .map-card .copy-btn.copied { color: var(--success-color); transform: scale(1.2); }
+        
+        /* --- Top Creators Section --- */
+        #top-creators-container { display: flex; gap: 25px; justify-content: center; flex-wrap: wrap; }
+        .creator-card { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+        .creator-card .creator-avatar {
+            width: 80px; height: 80px; border-radius: 50%;
+            object-fit: cover; border: 3px solid var(--border-color);
+        }
+        .creator-card .creator-name { font-weight: 600; font-size: 1.1rem; }
+        .creator-card .creator-ccu { font-size: 0.9rem; color: var(--secondary-text-color); display: flex; align-items: center; gap: 5px; }
+        
+        /* --- Search Results --- */
+        #search-results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(var(--card-width), 1fr));
+            gap: 20px;
+        }
+
+        /* --- Utility & Responsive --- */
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            :root {
+                --card-width: 240px; --card-height: 135px;
+                --card-width-large: 100%; --card-height-large: 200px;
+            }
+            main { padding: 1.5rem 4%; }
+            .header-top-row, .header-bottom-row { flex-direction: column; align-items: stretch; text-align: center; }
+            .last-updated { text-align: center; margin-bottom: 0.5rem; }
+            #search-bar { width: 100%; }
+            .map-card, .map-card.large { width: 100%; }
+            .horizontal-scroll-container {
+                -ms-overflow-style: none; /* IE and Edge */
+                scrollbar-width: none; /* Firefox */
+            }
+            .horizontal-scroll-container::-webkit-scrollbar { display: none; /* Safari and Chrome */ }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader"><div class="loader-dot"></div></div>
+
+    <header>
+        <div class="header-top-row">
+            <div class="logo">🎮 GreekFN</div>
+            <div id="last-updated" class="last-updated"></div>
+        </div>
+        <div class="header-bottom-row">
+            <nav id="main-nav"></nav>
+            <input type="search" id="search-bar" placeholder="Search for any island...">
+        </div>
+    </header>
+
+    <main id="main-content">
+        <div id="panels-view">
+            <section id="most-played-section" class="content-section">
+                <h2>🏆 Most Played</h2>
+                <div id="most-played-container" class="horizontal-scroll-container"></div>
+            </section>
+            <div id="panels-container"></div>
+            <section id="top-creators-section" class="content-section">
+                <h2>✨ Top Creators</h2>
+                <div id="top-creators-container"></div>
+            </section>
+        </div>
+        <div id="search-results-view" class="hidden">
+             <section class="content-section is-visible">
+                <h2 id="search-results-title">Search Results</h2>
+                <div id="search-results-container"></div>
+            </section>
+        </div>
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const API_URL = 'https://fnzone.es/_next/data/TDYxmKfi6TY7EFeLq5QA8/en/creative.json';
+            const mainContent = document.getElementById('main-content');
+            const loader = document.getElementById('loader');
+            const searchBar = document.getElementById('search-bar');
+            const panelsView = document.getElementById('panels-view');
+            const searchResultsView = document.getElementById('search-results-view');
+            const lastUpdatedDiv = document.getElementById('last-updated');
+            let allMaps = [];
+
+            const userIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/></svg>`;
+            const copyIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zM8 2h1v1H8zM4.5 3A1.5 1.5 0 0 1 6 1.5h4A1.5 1.5 0 0 1 11.5 3v1h-7z"/></svg>`;
+            const checkIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>`;
+
+            const observer = new IntersectionObserver((entries, obs) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            const observeElements = (selector) => {
+                document.querySelectorAll(selector).forEach(el => observer.observe(el));
+            };
+
+            const formatRelativeTime = (timestamp) => {
+                const now = new Date();
+                const updatedTime = new Date(timestamp);
+                const diffSeconds = Math.round((now - updatedTime) / 1000);
+
+                if (diffSeconds < 60) return `Updated just now`;
+                const diffMinutes = Math.round(diffSeconds / 60);
+                if (diffMinutes < 60) return `Updated ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+                const diffHours = Math.round(diffMinutes / 60);
+                if (diffHours < 24) return `Updated ${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+                const diffDays = Math.round(diffHours / 24);
+                return `Updated ${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+            };
+            
+            async function fetchDataAndRender() {
+                try {
+                    const response = await fetch(API_URL);
+                    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                    const { pageProps } = await response.json();
+                    
+                    if (!pageProps) throw new Error("`pageProps` not found.");
+
+                    const { topIslands, data: panels, topCreators, lastUpdated } = pageProps;
+                    allMaps = panels.flatMap(panel => panel.results);
+
+                    if (lastUpdated) {
+                        lastUpdatedDiv.textContent = formatRelativeTime(lastUpdated);
+                    }
+                    
+                    const mostPlayedContainer = document.getElementById('most-played-container');
+                    const panelsContainer = document.getElementById('panels-container');
+                    const topCreatorsContainer = document.getElementById('top-creators-container');
+
+                    mostPlayedContainer.innerHTML = topIslands.map(island => createMapCardHTML(island, true)).join('');
+                    panelsContainer.innerHTML = panels.map(panel => {
+                        if (!panel.results || panel.results.length === 0) return '';
+                        return `
+                            <section class="content-section" id="panel-${panel.panelId.replace(/_/g, '-')}">
+                                <h2>${panel.panelName}</h2>
+                                <div class="horizontal-scroll-container">${panel.results.map(island => createMapCardHTML(island, false)).join('')}</div>
+                            </section>`;
+                    }).join('');
+                    topCreatorsContainer.innerHTML = topCreators.map(creator => `
+                        <div class="creator-card">
+                            <img src="${creator.iconImage}" alt="${creator.creatorSlug}" class="creator-avatar" loading="lazy">
+                            <div class="creator-name">${creator.creatorSlug}</div>
+                            <div class="creator-ccu">${userIconSVG}<span>${creator.totalCCU.toLocaleString()} Total Players</span></div>
+                        </div>`).join('');
+
+                    renderNavigation(panels);
+                    observeElements('.content-section, .map-card');
+                    loader.classList.add('fade-out');
+                    loader.addEventListener('transitionend', () => loader.classList.add('hidden'));
+
+                } catch (error) {
+                    console.error('Failed to fetch or render data:', error);
+                    loader.innerHTML = '<p>Failed to load data. Please try again later.</p>';
+                }
+            }
+
+            function createMapCardHTML(island, isLarge = false) {
+                const hasVideo = island.videoUrl && island.videoUrl.trim() !== '';
+                const videoAttr = hasVideo ? `data-video-card="true" data-video-src="${island.videoUrl}"` : '';
+                return `
+                    <div class="map-card ${isLarge ? 'large' : ''}" ${videoAttr}>
+                        <img class="card-background card-image" src="${island.smallImage}" alt="${island.islandTitle}" loading="lazy">
+                        ${hasVideo ? `<video class="card-background card-video" muted loop playsinline preload="metadata"></video>` : ''}
+                        ${island.islandRank ? `<div class="island-rank">${island.islandRank}</div>` : ''}
+                        <div class="player-count">${userIconSVG}<span>${island.globalCCU.toLocaleString()}</span></div>
+                        <div class="card-overlay">
+                            <div><h3 class="island-title">${island.islandTitle}</h3><p class="creator-slug">by ${island.creatorSlug}</p></div>
+                            <div class="map-code-container">
+                                <span class="map-code">${island.islandCode}</span>
+                                <button class="copy-btn" aria-label="Copy Map Code" data-code="${island.islandCode}">${copyIconSVG}</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            function renderNavigation(panels) {
+                const nav = document.querySelector('#main-nav');
+                const importantPanels = panels.filter(p => ['Homebar', 'Popular', 'Combat', 'Variety', 'Practice'].includes(p.panelName));
+                nav.innerHTML = importantPanels.map(panel => `<a href="#panel-${panel.panelId.replace(/_/g, '-')}">${panel.panelName}</a>`).join('');
+            }
+            
+            function handleSearch(event) {
+                const query = event.target.value.toLowerCase().trim();
+                const searchResultsContainer = document.getElementById('search-results-container');
+                const searchResultsTitle = document.getElementById('search-results-title');
+
+                if (query.length === 0) {
+                    panelsView.classList.remove('hidden');
+                    searchResultsView.classList.add('hidden');
+                    return;
+                }
+                panelsView.classList.add('hidden');
+                searchResultsView.classList.remove('hidden');
+
+                const filteredMaps = allMaps.filter(map => map.islandTitle.toLowerCase().includes(query));
+                searchResultsTitle.textContent = `Found ${filteredMaps.length} results for "${query}"`;
+                searchResultsContainer.innerHTML = filteredMaps.length > 0
+                    ? filteredMaps.map(island => createMapCardHTML(island, false)).join('')
+                    : `<p>No maps found matching your search.</p>`;
+                
+                observeElements('#search-results-container .map-card');
+            }
+            
+            mainContent.addEventListener('click', (event) => {
+                const copyButton = event.target.closest('.copy-btn');
+                if (copyButton && !copyButton.classList.contains('copied')) {
+                    navigator.clipboard.writeText(copyButton.dataset.code).then(() => {
+                        copyButton.innerHTML = checkIconSVG;
+                        copyButton.classList.add('copied');
+                        setTimeout(() => {
+                           copyButton.innerHTML = copyIconSVG;
+                           copyButton.classList.remove('copied');
+                        }, 2000);
+                    });
+                }
+            });
+
+            mainContent.addEventListener('mouseover', async (event) => {
+                const card = event.target.closest('[data-video-card]');
+                if (card) {
+                    const video = card.querySelector('video');
+                    const videoSrc = card.dataset.videoSrc;
+                    if (video && videoSrc && !card.classList.contains('is-playing')) {
+                        card.classList.add('is-playing');
+                        try {
+                            if (videoSrc.endsWith('.m3u8') && Hls.isSupported()) {
+                                if (video.hls) video.hls.destroy();
+                                const hls = new Hls();
+                                video.hls = hls; // Attach instance to element
+                                hls.loadSource(videoSrc);
+                                hls.attachMedia(video);
+                                await video.play();
+                            } else if (video.canPlayType('application/vnd.apple.mpegurl')) { // Native HLS support (Safari)
+                                video.src = videoSrc;
+                                await video.play();
+                            } else { // Standard video formats like MP4
+                                video.src = videoSrc;
+                                await video.play();
+                            }
+                        } catch (err) {
+                            console.error("Video play failed:", err);
+                            card.classList.remove('is-playing');
+                        }
+                    }
+                }
+            });
+
+            mainContent.addEventListener('mouseout', (event) => {
+                const card = event.target.closest('[data-video-card]');
+                if (card) {
+                    const video = card.querySelector('video');
+                    if (video) {
+                        card.classList.remove('is-playing');
+                        if (video.hls) { // If HLS.js was used, destroy the instance
+                            video.hls.destroy();
+                        }
+                        video.pause();
+                        video.removeAttribute('src'); // Unload the video source to save resources
+                        video.load();
+                    }
+                }
+            });
+            
+            document.querySelector('header').addEventListener('click', (event) => {
+                const navLink = event.target.closest('nav a');
+                if (navLink) {
+                    event.preventDefault();
+                    document.querySelector(navLink.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+
+            searchBar.addEventListener('input', handleSearch);
+            fetchDataAndRender();
+        });
+    </script>
+</body>
+</html>
