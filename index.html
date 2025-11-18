@@ -13,6 +13,9 @@
     <!-- FontAwesome (CDN via Cloudflare) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Chart.js for Metrics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
 
@@ -144,7 +147,7 @@
                         </div>
                     </div>
 
-                    <!-- Status Badge (Minimal - No Text) -->
+                    <!-- Status Badge -->
                     <div class="text-xs font-bold px-2 py-2 rounded-full border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm flex items-center justify-center shadow-sm w-8 h-8" id="status-indicator" title="Status">
                         <span class="relative flex h-2.5 w-2.5">
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
@@ -205,6 +208,7 @@
         // --- Configuration ---
         const NEXT_DATA_API = "https://fnzone.es/_next/data/uia3PTQJwe47bgy4hnG2c/en";
         const BACKEND_API = "https://fnzone.es/api/backend/v2";
+        const METRICS_API_BASE = "https://api.fortnite.com/ecosystem/v1/islands";
         const HOME_ENDPOINT = "/discover.json";
         
         // Extended Proxy Options (Prioritizing Cloudflare-backed proxies)
@@ -215,8 +219,6 @@
                 `https://corsproxy.io/?${encoded}`,
                 // AllOrigins
                 `https://api.allorigins.win/raw?url=${encoded}`,
-                // CodeTabs
-                `https://api.codetabs.com/v1/proxy?quest=${encoded}`,
                 // Fallback to ThingProxy
                 `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
                 // Direct
@@ -228,8 +230,8 @@
         const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
         
         // Keys for LocalStorage
-        const STORAGE_KEY_DATA = 'fn_discovery_data_v5';
-        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v5';
+        const STORAGE_KEY_DATA = 'fn_discovery_data_v6';
+        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v6';
 
         // --- State ---
         let timerInterval;
@@ -237,6 +239,7 @@
         let currentCategoryName = '';
         let currentIslandCode = '';
         let currentCreatorId = '';
+        let chartInstance = null; // Store chart instance to destroy it before creating new one
         
         // Global cache for surfaces (Categories)
         window.cachedSurfaces = [];
@@ -279,11 +282,9 @@
             return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        // NEW: Sanitize tags for URL routing (No spaces, lowercase, custom maps)
+        // Sanitize tags for URL routing
         function sanitizeTag(tag) {
             const lower = tag.toLowerCase().trim();
-            
-            // Custom mappings based on typical API expectations
             const map = {
                 'free for all': 'ffa',
                 'prop hunt': 'prophunt',
@@ -297,11 +298,7 @@
                 'battle royale': 'battleroyale',
                 'gun game': 'gungame'
             };
-            
-            if (map[lower]) return map[lower];
-            
-            // Default fallback: remove all spaces
-            return lower.replace(/\s+/g, '');
+            return map[lower] || lower.replace(/\s+/g, '');
         }
 
         function copyCode(code, event) {
@@ -351,27 +348,20 @@
             for (const [key, value] of Object.entries(params)) {
                 if (value) searchParams.set(key, value);
             }
-            // Creates #/path?param=value
             window.location.hash = path + (searchParams.toString() ? '?' + searchParams.toString() : '');
         }
 
         function handleRouting() {
-            // Read from Hash
-            let hash = window.location.hash.substring(1); // remove #
-            if (!hash) hash = '/discovery'; // default path
-
-            // Fallback for legacy/param-only hashes from previous versions
-            if (!hash.startsWith('/')) {
-                 hash = '/discovery';
-            }
+            let hash = window.location.hash.substring(1);
+            if (!hash) hash = '/discovery';
+            if (!hash.startsWith('/')) hash = '/discovery';
 
             const [path, search] = hash.split('?');
             const params = new URLSearchParams(search);
 
             if (path === '/discovery') {
-                // Avoid infinite loops/redundant fetches
                 if (currentView !== 'home') {
-                     fetchHomeData(false); // false = don't push state again
+                     fetchHomeData(false); 
                 }
             } 
             else if (path === '/island') {
@@ -379,8 +369,7 @@
                 if (code) viewIsland(code, false); 
             } 
             else if (path === '/creator') {
-                // 'name' in URL will effectively hold the ID as per API requirements
-                const id = params.get('name'); 
+                const id = params.get('name'); // using 'name' param for ID
                 if (id) viewCreator(id, false);
             } 
             else if (path === '/creative') {
@@ -388,13 +377,112 @@
                 if (tag) fetchCategoryData(tag, false);
             } 
             else {
-                // Unknown path -> home
                  if (currentView !== 'home') resetToHome(false);
             }
         }
 
         window.addEventListener('hashchange', handleRouting);
 
+        // --- Charts & Metrics ---
+
+        async function loadIslandMetrics(code) {
+             // Get current ISO time minus 24 hours for "from" parameter
+            const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            const metricsUrl = `${METRICS_API_BASE}/${code}/metrics/minute/peak-ccu?from=${fromDate}`;
+            
+            const data = await performFetch(metricsUrl);
+            
+            const canvas = document.getElementById('ccuChart');
+            const liveDisplay = document.getElementById('live-ccu-display');
+            
+            if (data && data.intervals && data.intervals.length > 0) {
+                
+                // Filter out null values
+                const validPoints = data.intervals.filter(p => p.value !== null);
+                
+                // Update Live Stats Display
+                if (liveDisplay && validPoints.length > 0) {
+                     const lastValue = validPoints[validPoints.length - 1].value;
+                     liveDisplay.innerHTML = `
+                        <span class="relative flex h-2.5 w-2.5 mr-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                        ${formatNumber(lastValue)}
+                     `;
+                }
+
+                // Render Chart
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    const labels = validPoints.map(p => {
+                        const date = new Date(p.timestamp);
+                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    });
+                    const values = validPoints.map(p => p.value);
+
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradient.addColorStop(0, 'rgba(250, 204, 21, 0.5)'); // Yellow
+                    gradient.addColorStop(1, 'rgba(250, 204, 21, 0.0)');
+
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+
+                    chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Players (CCU)',
+                                data: values,
+                                borderColor: '#FACC15',
+                                backgroundColor: gradient,
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                pointHoverRadius: 4,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                intersect: false,
+                                mode: 'index',
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1e293b',
+                                    titleColor: '#fff',
+                                    bodyColor: '#cbd5e1',
+                                    borderColor: '#334155',
+                                    borderWidth: 1,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return 'Players: ' + context.parsed.y;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    border: { display: false },
+                                    grid: { color: '#334155', drawBorder: false },
+                                    ticks: { color: '#94a3b8', maxTicksLimit: 5 }
+                                }
+                            }
+                        }
+                    });
+                    
+                    document.getElementById('chart-container').classList.remove('hidden');
+                }
+            }
+        }
 
         // --- Rendering Logic ---
 
@@ -455,7 +543,6 @@
             if (!surfaces || surfaces.length === 0) return '';
 
             const items = surfaces.map(surface => {
-                // Ensure we are matching sanitized names
                 const surfaceTag = sanitizeTag(surface.surfaceHref || surface.displayName);
                 const isActive = currentView === 'category' && currentCategoryName === surfaceTag;
                 const activeClass = isActive ? 'category-active' : '';
@@ -531,10 +618,12 @@
             const updateDate = formatDate(islandData.lastUpdated);
             const maxPlayers = islandData.maxPlayers || '-';
 
-            // Tags are now links that trigger a category fetch with SANITIZED tag
             const tagsHtml = tags.map(tag => 
                 `<button onclick="fetchCategoryData('${sanitizeTag(tag)}', true)" class="px-3 py-1 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-yellow-400 transition-all text-xs font-bold uppercase rounded-full border border-slate-700 cursor-pointer">${tag}</button>`
             ).join('');
+            
+            // Trigger Chart Load
+            setTimeout(() => loadIslandMetrics(code), 100);
 
             return `
                 <div class="animate-fade-in max-w-5xl mx-auto">
@@ -576,6 +665,8 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="lg:col-span-2 space-y-8">
+                            
+                            <!-- Description -->
                             <div class="bg-fn-card border border-slate-800 p-6 rounded-2xl">
                                 <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
                                     <i class="fa-solid fa-circle-info text-blue-500"></i> About
@@ -583,6 +674,17 @@
                                 ${tagline ? `<p class="text-lg text-white font-medium mb-4 italic border-l-4 border-yellow-400 pl-4 py-1 bg-slate-900/50 rounded-r-lg">${tagline}</p>` : ''}
                                 <p class="text-slate-400 leading-relaxed whitespace-pre-line">${intro}</p>
                             </div>
+                            
+                            <!-- Chart Container -->
+                            <div id="chart-container" class="hidden bg-fn-card border border-slate-800 p-6 rounded-2xl">
+                                <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-line text-green-400"></i> 24h Player Activity
+                                </h3>
+                                <div class="h-64 w-full">
+                                    <canvas id="ccuChart"></canvas>
+                                </div>
+                            </div>
+
                             ${tags.length > 0 ? `
                             <div>
                                 <h4 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Tags</h4>
@@ -592,8 +694,17 @@
                             </div>
                             ` : ''}
                         </div>
+                        
+                        <!-- Side Panel -->
                         <div class="space-y-4">
                             <div class="bg-fn-card border border-slate-800 p-5 rounded-2xl space-y-4">
+                                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                                    <span class="text-slate-400 text-sm">Live Players</span>
+                                    <span id="live-ccu-display" class="text-white font-bold font-mono flex items-center gap-2">
+                                        <span class="w-2 h-2 bg-slate-600 rounded-full"></span>
+                                        Loading...
+                                    </span>
+                                </div>
                                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                                     <span class="text-slate-400 text-sm">Max Players</span>
                                     <span class="text-white font-bold font-mono">${maxPlayers}</span>
@@ -624,6 +735,25 @@
             const avatar = creator.images?.avatar || 'https://via.placeholder.com/150/151A23/ffffff?text=?';
             const displayName = creator.displayName || 'Unknown Creator';
             const followers = formatNumber(creator.followerCount);
+            
+            const socials = creator.social || {};
+            let socialLinksHtml = '';
+            
+            if (socials.twitter) {
+                socialLinksHtml += `<a href="https://twitter.com/${socials.twitter}" target="_blank" class="text-slate-400 hover:text-blue-400 transition-colors"><i class="fa-brands fa-twitter text-xl"></i></a>`;
+            }
+            if (socials.youtube) {
+                socialLinksHtml += `<a href="https://youtube.com/${socials.youtube}" target="_blank" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-brands fa-youtube text-xl"></i></a>`;
+            }
+            if (socials.instagram) {
+                 socialLinksHtml += `<a href="https://instagram.com/${socials.instagram}" target="_blank" class="text-slate-400 hover:text-pink-500 transition-colors"><i class="fa-brands fa-instagram text-xl"></i></a>`;
+            }
+            if (socials.twitch) {
+                 socialLinksHtml += `<a href="https://twitch.tv/${socials.twitch}" target="_blank" class="text-slate-400 hover:text-purple-500 transition-colors"><i class="fa-brands fa-twitch text-xl"></i></a>`;
+            }
+            if (socials.discord) {
+                 socialLinksHtml += `<a href="${socials.discord}" target="_blank" class="text-slate-400 hover:text-indigo-400 transition-colors"><i class="fa-brands fa-discord text-xl"></i></a>`;
+            }
 
             const cardsHtml = islands.map(createCard).join('');
 
@@ -648,9 +778,14 @@
                             </div>
                             <div class="flex-1 text-center md:text-left mb-2">
                                 <h1 class="text-4xl md:text-5xl font-display font-bold text-white shadow-lg">${displayName}</h1>
-                                <div class="flex items-center justify-center md:justify-start gap-4 mt-2 text-slate-300 font-medium">
-                                    <span><i class="fa-solid fa-users text-yellow-400 mr-1"></i> ${followers} Followers</span>
-                                    <span><i class="fa-solid fa-cube text-blue-400 mr-1"></i> ${islands.length} Islands</span>
+                                
+                                <div class="flex flex-col md:flex-row items-center gap-4 mt-2">
+                                    <div class="flex items-center gap-4 text-slate-300 font-medium">
+                                        <span><i class="fa-solid fa-users text-yellow-400 mr-1"></i> ${followers} Followers</span>
+                                        <span><i class="fa-solid fa-cube text-blue-400 mr-1"></i> ${islands.length} Islands</span>
+                                    </div>
+                                    
+                                    ${socialLinksHtml ? `<div class="h-6 w-px bg-slate-600 hidden md:block"></div><div class="flex gap-4 bg-slate-900/50 px-4 py-2 rounded-full backdrop-blur-sm">${socialLinksHtml}</div>` : ''}
                                 </div>
                             </div>
                         </div>
