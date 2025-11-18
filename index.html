@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fortnite Discovery Browser</title>
     <meta name="description" content="Fortnite Discovery Browser - Fast, Secure, Reliable">
+    <meta name="robots" content="noindex, nofollow"> <!-- Anti-Crawler -->
     
-    <!-- Tailwind CSS (CDN via Cloudflare) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js" xintegrity="sha512-6uI7y51J4c1r98+4n0vF7z72c5k77d7c746d6e5f415e5c41" crossorigin="anonymous"></script>
+    <!-- Tailwind CSS (Corrected) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- FontAwesome (CDN via Cloudflare) -->
@@ -105,9 +105,63 @@
             border-color: #FACC15 !important;
             background-color: #1e293b !important;
         }
+
+        /* Security Overlay Styles */
+        #security-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: #0B0E14;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* Prevent text selection for basic protection */
+        body.protected {
+            user-select: none;
+            -webkit-user-select: none;
+        }
     </style>
 </head>
-<body class="bg-fn-dark text-white min-h-screen font-sans selection:bg-yellow-500/30">
+<body class="bg-fn-dark text-white min-h-screen font-sans selection:bg-yellow-500/30 protected" oncontextmenu="return false;">
+
+    <!-- Security Gateway Overlay -->
+    <div id="security-overlay">
+        <div class="text-center max-w-md px-6">
+            <div class="mb-6 relative">
+                <div class="w-16 h-16 border-4 border-slate-700 border-t-yellow-400 rounded-full animate-spin mx-auto"></div>
+                <i class="fa-solid fa-shield-halved absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-slate-500"></i>
+            </div>
+            <h2 class="text-2xl font-display font-bold text-white mb-2">Checking Connection</h2>
+            <p class="text-slate-400 text-sm mb-6" id="security-status">Verifying browser integrity...</p>
+            
+            <div class="flex flex-col gap-2 text-xs text-slate-500">
+                <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded border border-slate-700/50" id="row-ddos">
+                    <span>DDoS Protection</span>
+                    <span class="text-green-400" id="icon-ddos"><i class="fa-solid fa-check"></i></span>
+                </div>
+                <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded border border-slate-700/50" id="row-adblock">
+                    <span>Adblock Check</span>
+                    <span id="icon-adblock" class="text-yellow-400"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                </div>
+                <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded border border-slate-700/50" id="row-bot">
+                    <span>Bot Detection</span>
+                    <span id="icon-bot" class="text-yellow-400"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                </div>
+            </div>
+            
+            <div id="security-error" class="hidden mt-6 bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded text-sm font-bold">
+                <i class="fa-solid fa-triangle-exclamation mr-2"></i> <span id="error-msg">Access Denied</span>
+            </div>
+            
+            <div id="skip-btn" class="hidden mt-4">
+                <button onclick="bypassSecurity()" class="text-xs text-slate-500 hover:text-slate-300 underline">Skip Checks (Dev)</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Navbar -->
     <nav class="sticky top-0 z-50 glass-nav border-b border-slate-800/50 shadow-lg">
@@ -173,7 +227,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-black/20 backdrop-blur-lg text-slate-500 py-8 text-center border-t border-slate-800 mt-12">
+    <footer class="bg-black/20 backdrop-blur-lg text-slate-500 py-8 text-center border-t border-slate-800 mt-12 select-none">
         <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="text-xs text-slate-600 text-left">
                  <p class="font-medium text-slate-700">Not affiliated with Epic Games.</p>
@@ -181,13 +235,13 @@
             
             <!-- Cloudflare / Security Badge Simulation -->
             <div class="flex items-center gap-4">
-                 <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50">
+                 <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50 hover:bg-slate-700 cursor-help" title="DDoS Protection Active">
                     <i class="fa-solid fa-shield-halved text-orange-400 text-xs"></i>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">DDoS Protected</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Secure</span>
                 </div>
                 <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50">
                     <i class="fa-solid fa-bolt text-yellow-400 text-xs"></i>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CDN Optimized</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CDN</span>
                 </div>
             </div>
         </div>
@@ -204,47 +258,138 @@
         </div>
     </div>
 
+    <!-- Bait for Adblocker Detection -->
+    <div id="ad-banner" class="ad-banner adsbox" style="position:absolute; top:-999px; left:-999px; width:1px; height:1px; background:transparent;"></div>
+
     <script>
+        // --- Anti-DevTools & Protection ---
+        
+        // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+        document.addEventListener('keydown', function(e) {
+            if (
+                e.keyCode === 123 || // F12
+                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
+                (e.ctrlKey && e.keyCode === 85) // Ctrl+U
+            ) {
+                e.preventDefault();
+            }
+        });
+
+        // --- Security Checks ---
+        let securityCheckPassed = false;
+
+        function bypassSecurity() {
+            const overlay = document.getElementById('security-overlay');
+            if(overlay) overlay.style.display = 'none';
+            securityCheckPassed = true;
+            checkAndSchedule();
+        }
+        
+        async function runSecurityChecks() {
+            if (securityCheckPassed) return;
+
+            const statusEl = document.getElementById('security-status');
+            const adblockEl = document.getElementById('icon-adblock');
+            const botEl = document.getElementById('icon-bot');
+            const overlay = document.getElementById('security-overlay');
+            const errorBox = document.getElementById('security-error');
+            const errorMsg = document.getElementById('error-msg');
+            
+            // Safety timeout to prevent infinite loading
+            const safetyTimeout = setTimeout(() => {
+                if (!securityCheckPassed) {
+                    console.warn("Security check timed out, proceeding safely...");
+                    bypassSecurity();
+                }
+            }, 5000); // 5 seconds max
+
+            // Update Helper
+            const updateStep = (rowId, iconId) => {
+                const row = document.getElementById(rowId);
+                const icon = document.getElementById(iconId);
+                if(row) {
+                    row.classList.replace('border-slate-700/50', 'border-green-500/30');
+                    row.classList.replace('bg-slate-800/50', 'bg-green-500/10');
+                }
+                if(icon) icon.innerHTML = '<i class="fa-solid fa-check text-green-400"></i>';
+            };
+
+            try {
+                // 1. DDoS (Simulated Instant)
+                updateStep('row-ddos', 'icon-ddos');
+
+                // 2. Adblock Detection (Fixed Logic)
+                await new Promise(r => setTimeout(r, 300));
+                const adBait = document.getElementById('ad-banner');
+                const adStyles = adBait ? window.getComputedStyle(adBait) : null;
+                
+                if (!adBait || (adStyles && (adStyles.display === 'none' || adStyles.visibility === 'hidden'))) {
+                     // Detected - Warn but don't block for now
+                     if(adblockEl) adblockEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-yellow-400"></i>';
+                } else {
+                    updateStep('row-adblock', 'icon-adblock');
+                }
+
+                // 3. Bot Detection (Headless Check - Fast)
+                await new Promise(r => setTimeout(r, 300));
+                const isHeadless = navigator.webdriver || !navigator.languages || navigator.languages.length === 0;
+                if (isHeadless) {
+                    if(botEl) botEl.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
+                } else {
+                    updateStep('row-bot', 'icon-bot');
+                }
+                
+                // 3. Finish (Fast fade out)
+                statusEl.textContent = "Connection Secure";
+                statusEl.classList.add('text-green-400');
+                await new Promise(r => setTimeout(r, 400));
+                
+                clearTimeout(safetyTimeout);
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    securityCheckPassed = true;
+                    checkAndSchedule(); 
+                }, 300);
+
+            } catch (e) {
+                console.error("Security Check Error:", e);
+                bypassSecurity();
+            }
+        }
+
         // --- Configuration ---
         const NEXT_DATA_API = "https://fnzone.es/_next/data/uia3PTQJwe47bgy4hnG2c/en";
         const BACKEND_API = "https://fnzone.es/api/backend/v2";
         const METRICS_API_BASE = "https://api.fortnite.com/ecosystem/v1/islands";
         const HOME_ENDPOINT = "/discover.json";
         
-        // Extended Proxy Options (Prioritizing Cloudflare-backed proxies)
         function getProxies(targetUrl) {
             const encoded = encodeURIComponent(targetUrl);
             return [
-                // CorsProxy.io uses Cloudflare Workers (Fast & Secure)
                 `https://corsproxy.io/?${encoded}`,
-                // AllOrigins
                 `https://api.allorigins.win/raw?url=${encoded}`,
-                // Fallback to ThingProxy
                 `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
-                // Direct
                 targetUrl
             ];
         }
         
-        // Refresh Interval: 5 minutes
         const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
         
-        // Keys for LocalStorage
         const STORAGE_KEY_DATA = 'fn_discovery_data_v6';
         const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v6';
 
         // --- State ---
         let timerInterval;
-        let currentView = 'home'; // 'home', 'category', 'details', 'creator'
+        let currentView = 'home'; 
         let currentCategoryName = '';
         let currentIslandCode = '';
         let currentCreatorId = '';
-        let chartInstance = null; // Store chart instance to destroy it before creating new one
+        let chartInstance = null;
         
-        // Global cache for surfaces (Categories)
         window.cachedSurfaces = [];
 
-        // --- Sample Data Fallback ---
+        // --- Sample Data ---
         const SAMPLE_DATA = {
             "pageProps": {
                 "discoveryData": [
@@ -282,7 +427,6 @@
             return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        // Sanitize tags for URL routing
         function sanitizeTag(tag) {
             const lower = tag.toLowerCase().trim();
             const map = {
@@ -325,6 +469,62 @@
             if (el) el.textContent = timeStr;
         }
 
+        // --- Definitions Restored ---
+
+        function updateTimerDisplay(msRemaining) {
+            if (currentView !== 'home') {
+                 const timerText = document.getElementById('timer-text');
+                 const timerBar = document.getElementById('timer-bar');
+                 if(timerText) timerText.textContent = "--:--";
+                 if(timerBar) timerBar.style.width = "0%";
+                 return;
+            }
+
+            const secondsRemaining = Math.max(0, Math.floor(msRemaining / 1000));
+            const minutes = Math.floor(secondsRemaining / 60);
+            const seconds = secondsRemaining % 60;
+            
+            const textEl = document.getElementById('timer-text');
+            const barEl = document.getElementById('timer-bar');
+            
+            if(textEl) textEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            if(barEl) {
+                const percentage = (msRemaining / REFRESH_INTERVAL_MS) * 100;
+                barEl.style.width = `${percentage}%`;
+                
+                if (msRemaining < 10000) {
+                    textEl.classList.add('text-red-500', 'animate-pulse');
+                    textEl.classList.remove('text-yellow-400');
+                    barEl.classList.replace('from-yellow-400', 'from-red-500');
+                } else {
+                    textEl.classList.remove('text-red-500', 'animate-pulse');
+                    textEl.classList.add('text-yellow-400');
+                    barEl.classList.replace('from-red-500', 'from-yellow-400');
+                }
+            }
+        }
+
+        function updateURL(path, params = {}) {
+            const searchParams = new URLSearchParams();
+            for (const [key, value] of Object.entries(params)) {
+                if (value) searchParams.set(key, value);
+            }
+            window.location.hash = path + (searchParams.toString() ? '?' + searchParams.toString() : '');
+        }
+
+        function resetToHome(pushState = true) {
+            if (pushState) {
+                 updateURL('/discovery');
+            }
+            currentView = 'home';
+            const savedDataStr = localStorage.getItem(STORAGE_KEY_DATA);
+            if (savedDataStr) {
+                renderApp(JSON.parse(savedDataStr));
+            } else {
+                fetchHomeData(false); 
+            }
+        }
+
         function goBack() {
              if (currentView === 'creator') {
                 if (currentIslandCode) updateURL('/island', { code: currentIslandCode });
@@ -341,15 +541,20 @@
             }
         }
 
-        // --- URL Management (Path-based Hash Routing) ---
-        
-        function updateURL(path, params = {}) {
-            const searchParams = new URLSearchParams();
-            for (const [key, value] of Object.entries(params)) {
-                if (value) searchParams.set(key, value);
+        function forceRefresh() {
+             if (currentView === 'home') {
+                localStorage.removeItem(STORAGE_KEY_TIMESTAMP);
+                fetchHomeData(false);
+            } else if (currentView === 'category' && currentCategoryName) {
+                fetchCategoryData(currentCategoryName, false);
+            } else if (currentView === 'details' && currentIslandCode) {
+                viewIsland(currentIslandCode, false);
+            } else if (currentView === 'creator' && currentCreatorId) {
+                viewCreator(currentCreatorId, false);
             }
-            window.location.hash = path + (searchParams.toString() ? '?' + searchParams.toString() : '');
         }
+
+        // --- Routing & API ---
 
         function handleRouting() {
             let hash = window.location.hash.substring(1);
@@ -369,7 +574,7 @@
                 if (code) viewIsland(code, false); 
             } 
             else if (path === '/creator') {
-                const id = params.get('name'); // using 'name' param for ID
+                const id = params.get('name'); 
                 if (id) viewCreator(id, false);
             } 
             else if (path === '/creative') {
@@ -383,10 +588,40 @@
 
         window.addEventListener('hashchange', handleRouting);
 
-        // --- Charts & Metrics ---
+        async function tryFetch(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return await response.json();
+            } catch (e) {
+                console.warn(`Fetch failed for ${url}`, e);
+                return null;
+            }
+        }
+
+        async function performFetch(targetUrl) {
+            setStatus('loading');
+            const proxies = getProxies(targetUrl);
+            
+            let data = null;
+            
+            for (const url of proxies) {
+                data = await tryFetch(url);
+                if (data) break;
+            }
+
+            if (data) {
+                if (data.contents) {
+                    try { data = JSON.parse(data.contents); } catch (e) {}
+                }
+                return data;
+            } else {
+                setStatus('error');
+                return null;
+            }
+        }
 
         async function loadIslandMetrics(code) {
-             // Get current ISO time minus 24 hours for "from" parameter
             const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             const metricsUrl = `${METRICS_API_BASE}/${code}/metrics/minute/peak-ccu?from=${fromDate}`;
             
@@ -396,11 +631,8 @@
             const liveDisplay = document.getElementById('live-ccu-display');
             
             if (data && data.intervals && data.intervals.length > 0) {
-                
-                // Filter out null values
                 const validPoints = data.intervals.filter(p => p.value !== null);
                 
-                // Update Live Stats Display
                 if (liveDisplay && validPoints.length > 0) {
                      const lastValue = validPoints[validPoints.length - 1].value;
                      liveDisplay.innerHTML = `
@@ -412,7 +644,6 @@
                      `;
                 }
 
-                // Render Chart
                 if (canvas) {
                     const ctx = canvas.getContext('2d');
                     const labels = validPoints.map(p => {
@@ -422,7 +653,7 @@
                     const values = validPoints.map(p => p.value);
 
                     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                    gradient.addColorStop(0, 'rgba(250, 204, 21, 0.5)'); // Yellow
+                    gradient.addColorStop(0, 'rgba(250, 204, 21, 0.5)'); 
                     gradient.addColorStop(1, 'rgba(250, 204, 21, 0.0)');
 
                     if (chartInstance) {
@@ -448,10 +679,7 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            interaction: {
-                                intersect: false,
-                                mode: 'index',
-                            },
+                            interaction: { intersect: false, mode: 'index' },
                             plugins: {
                                 legend: { display: false },
                                 tooltip: {
@@ -461,11 +689,7 @@
                                     borderColor: '#334155',
                                     borderWidth: 1,
                                     displayColors: false,
-                                    callbacks: {
-                                        label: function(context) {
-                                            return 'Players: ' + context.parsed.y;
-                                        }
-                                    }
+                                    callbacks: { label: (c) => 'Players: ' + c.parsed.y }
                                 }
                             },
                             scales: {
@@ -478,13 +702,10 @@
                             }
                         }
                     });
-                    
                     document.getElementById('chart-container').classList.remove('hidden');
                 }
             }
         }
-
-        // --- Rendering Logic ---
 
         function createCard(island) {
             const title = island.islandTitle || island.title || 'Unknown Title';
@@ -497,19 +718,10 @@
             return `
                 <div class="bg-fn-card rounded-2xl overflow-hidden card-hover group relative border border-slate-800 flex flex-col h-full cursor-pointer" onclick="viewIsland('${code}', true)">
                     <div class="relative aspect-video overflow-hidden bg-slate-900">
-                        <img 
-                            src="${cleanImage}" 
-                            alt="${title}" 
-                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                            loading="lazy"
-                            onerror="this.src='https://via.placeholder.com/480x270/151A23/ffffff?text=Fortnite+Island'"
-                        >
+                        <img src="${cleanImage}" alt="${title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" onerror="this.src='https://via.placeholder.com/480x270/151A23/ffffff?text=Fortnite+Island'">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
                         <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1.5 border border-white/10 shadow-lg">
-                            <span class="relative flex h-1.5 w-1.5">
-                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                              <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                            </span>
+                            <span class="relative flex h-1.5 w-1.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span></span>
                             ${ccu}
                         </div>
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
@@ -521,17 +733,11 @@
                     <div class="p-4 flex-1 flex flex-col justify-between relative z-10">
                         <div>
                             <h3 class="font-display font-bold text-lg leading-tight mb-1.5 text-white group-hover:text-yellow-400 transition-colors line-clamp-1" title="${title}">${title}</h3>
-                            ${creator ? `
-                            <div class="flex items-center gap-1 text-slate-400 text-xs mb-3">
-                                <i class="fa-solid fa-user-astronaut text-slate-600"></i>
-                                <span class="text-slate-400 font-medium hover:text-slate-200 transition-colors">${creator}</span>
-                            </div>` : '<div class="mb-3"></div>'}
+                            ${creator ? `<div class="flex items-center gap-1 text-slate-400 text-xs mb-3"><i class="fa-solid fa-user-astronaut text-slate-600"></i><span class="text-slate-400 font-medium hover:text-slate-200 transition-colors">${creator}</span></div>` : '<div class="mb-3"></div>'}
                         </div>
                         <div class="mt-auto pt-3 border-t border-slate-800/50 flex justify-between items-center">
                             <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Code</span>
-                            <span class="text-xs font-mono font-bold text-slate-300 bg-slate-900/80 border border-slate-700/50 px-2 py-1 rounded select-all cursor-pointer hover:bg-slate-800 hover:text-yellow-400 transition-colors" onclick="copyCode('${code}', event)">
-                                ${code}
-                            </span>
+                            <span class="text-xs font-mono font-bold text-slate-300 bg-slate-900/80 border border-slate-700/50 px-2 py-1 rounded select-all cursor-pointer hover:bg-slate-800 hover:text-yellow-400 transition-colors" onclick="copyCode('${code}', event)">${code}</span>
                         </div>
                     </div>
                 </div>
@@ -581,11 +787,9 @@
         function renderPanel(panel) {
             const cardsData = panel.firstPage || panel.links || [];
             if (cardsData.length === 0) return '';
-
             const title = panel.panelDisplayName?.en || panel.panelDisplayName || panel.panelName;
             const subtitle = panel.panelSubtitle?.en || panel.panelSubtitle || '';
             const cardsHtml = cardsData.map(createCard).join('');
-
             return `
                 <section class="animate-fade-in">
                     <div class="flex items-end gap-4 mb-6 border-b border-slate-800 pb-4">
@@ -622,7 +826,6 @@
                 `<button onclick="fetchCategoryData('${sanitizeTag(tag)}', true)" class="px-3 py-1 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-yellow-400 transition-all text-xs font-bold uppercase rounded-full border border-slate-700 cursor-pointer">${tag}</button>`
             ).join('');
             
-            // Trigger Chart Load
             setTimeout(() => loadIslandMetrics(code), 100);
 
             return `
@@ -665,8 +868,6 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="lg:col-span-2 space-y-8">
-                            
-                            <!-- Description -->
                             <div class="bg-fn-card border border-slate-800 p-6 rounded-2xl">
                                 <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
                                     <i class="fa-solid fa-circle-info text-blue-500"></i> About
@@ -675,7 +876,6 @@
                                 <p class="text-slate-400 leading-relaxed whitespace-pre-line">${intro}</p>
                             </div>
                             
-                            <!-- Chart Container -->
                             <div id="chart-container" class="hidden bg-fn-card border border-slate-800 p-6 rounded-2xl">
                                 <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
                                     <i class="fa-solid fa-chart-line text-green-400"></i> 24h Player Activity
@@ -695,7 +895,6 @@
                             ` : ''}
                         </div>
                         
-                        <!-- Side Panel -->
                         <div class="space-y-4">
                             <div class="bg-fn-card border border-slate-800 p-5 rounded-2xl space-y-4">
                                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -739,21 +938,11 @@
             const socials = creator.social || {};
             let socialLinksHtml = '';
             
-            if (socials.twitter) {
-                socialLinksHtml += `<a href="https://twitter.com/${socials.twitter}" target="_blank" class="text-slate-400 hover:text-blue-400 transition-colors"><i class="fa-brands fa-twitter text-xl"></i></a>`;
-            }
-            if (socials.youtube) {
-                socialLinksHtml += `<a href="https://youtube.com/${socials.youtube}" target="_blank" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-brands fa-youtube text-xl"></i></a>`;
-            }
-            if (socials.instagram) {
-                 socialLinksHtml += `<a href="https://instagram.com/${socials.instagram}" target="_blank" class="text-slate-400 hover:text-pink-500 transition-colors"><i class="fa-brands fa-instagram text-xl"></i></a>`;
-            }
-            if (socials.twitch) {
-                 socialLinksHtml += `<a href="https://twitch.tv/${socials.twitch}" target="_blank" class="text-slate-400 hover:text-purple-500 transition-colors"><i class="fa-brands fa-twitch text-xl"></i></a>`;
-            }
-            if (socials.discord) {
-                 socialLinksHtml += `<a href="${socials.discord}" target="_blank" class="text-slate-400 hover:text-indigo-400 transition-colors"><i class="fa-brands fa-discord text-xl"></i></a>`;
-            }
+            if (socials.twitter) socialLinksHtml += `<a href="https://twitter.com/${socials.twitter}" target="_blank" class="text-slate-400 hover:text-blue-400 transition-colors"><i class="fa-brands fa-twitter text-xl"></i></a>`;
+            if (socials.youtube) socialLinksHtml += `<a href="https://youtube.com/${socials.youtube}" target="_blank" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-brands fa-youtube text-xl"></i></a>`;
+            if (socials.instagram) socialLinksHtml += `<a href="https://instagram.com/${socials.instagram}" target="_blank" class="text-slate-400 hover:text-pink-500 transition-colors"><i class="fa-brands fa-instagram text-xl"></i></a>`;
+            if (socials.twitch) socialLinksHtml += `<a href="https://twitch.tv/${socials.twitch}" target="_blank" class="text-slate-400 hover:text-purple-500 transition-colors"><i class="fa-brands fa-twitch text-xl"></i></a>`;
+            if (socials.discord) socialLinksHtml += `<a href="${socials.discord}" target="_blank" class="text-slate-400 hover:text-indigo-400 transition-colors"><i class="fa-brands fa-discord text-xl"></i></a>`;
 
             const cardsHtml = islands.map(createCard).join('');
 
@@ -766,85 +955,53 @@
                         <span class="font-bold text-sm uppercase tracking-wider">Back</span>
                     </button>
 
-                    <!-- Banner Header -->
                     <div class="relative w-full h-64 md:h-80 rounded-3xl overflow-hidden mb-16 border border-slate-800">
                         <img src="${banner}" class="w-full h-full object-cover" alt="Banner">
                         <div class="absolute inset-0 bg-gradient-to-t from-fn-dark to-transparent"></div>
-                        
-                        <!-- Avatar & Name -->
                         <div class="absolute bottom-0 left-0 w-full p-6 md:p-10 flex flex-col md:flex-row items-center md:items-end gap-6">
                             <div class="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-fn-dark overflow-hidden shadow-2xl bg-slate-800">
                                 <img src="${avatar}" class="w-full h-full object-cover" alt="${displayName}">
                             </div>
                             <div class="flex-1 text-center md:text-left mb-2">
                                 <h1 class="text-4xl md:text-5xl font-display font-bold text-white shadow-lg">${displayName}</h1>
-                                
                                 <div class="flex flex-col md:flex-row items-center gap-4 mt-2">
                                     <div class="flex items-center gap-4 text-slate-300 font-medium">
                                         <span><i class="fa-solid fa-users text-yellow-400 mr-1"></i> ${followers} Followers</span>
                                         <span><i class="fa-solid fa-cube text-blue-400 mr-1"></i> ${islands.length} Islands</span>
                                     </div>
-                                    
                                     ${socialLinksHtml ? `<div class="h-6 w-px bg-slate-600 hidden md:block"></div><div class="flex gap-4 bg-slate-900/50 px-4 py-2 rounded-full backdrop-blur-sm">${socialLinksHtml}</div>` : ''}
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Islands Grid -->
                     <div class="mt-8">
                         <h3 class="text-2xl font-display font-bold text-white mb-6 pl-4 border-l-4 border-yellow-400">Published Islands</h3>
-                        ${islands.length > 0 ? 
-                            `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">${cardsHtml}</div>` 
-                            : `<p class="text-slate-500 text-center py-10">No published islands found.</p>`
-                        }
+                        ${islands.length > 0 ? `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">${cardsHtml}</div>` : `<p class="text-slate-500 text-center py-10">No published islands found.</p>`}
                     </div>
                 </div>
             `;
         }
 
-
         function renderApp(data) {
             const container = document.getElementById('main-container');
             container.innerHTML = '';
-            
-            if (!data) {
-                 container.innerHTML = '<div class="text-center text-red-400 mt-20">Error: No data received.</div>';
-                 return;
-            }
-
+            if (!data) { container.innerHTML = '<div class="text-center text-red-400 mt-20">Error: No data received.</div>'; return; }
             if (currentView === 'home' || currentView === 'category') {
                 const props = data.pageProps || {};
                 const surfaces = props.searchSurfaces || window.cachedSurfaces || [];
-                
-                if (surfaces.length > 0) {
-                    container.innerHTML += renderCategories(surfaces);
-                }
-                
+                if (surfaces.length > 0) container.innerHTML += renderCategories(surfaces);
                 const panels = props.discoveryData || props.surfacePanels;
-                if (!panels || panels.length === 0) {
-                    container.innerHTML += '<div class="text-center text-2xl text-slate-500 mt-20 font-display">No maps found.</div>';
-                } else {
-                    container.innerHTML += panels.map(renderPanel).join('');
-                }
-            } 
-            else if (currentView === 'details') {
-                if(data.pageProps && data.pageProps.islandData) {
-                    container.innerHTML = renderIslandDetails(data.pageProps.islandData);
-                } else {
-                     container.innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load island details.</div>';
-                }
-            }
-            else if (currentView === 'creator') {
-                 if(data.success && data.creatorData) {
-                    container.innerHTML = renderCreatorProfile(data);
-                 } else {
-                    container.innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load creator profile.</div>';
-                 }
+                if (!panels || panels.length === 0) container.innerHTML += '<div class="text-center text-2xl text-slate-500 mt-20 font-display">No maps found.</div>';
+                else container.innerHTML += panels.map(renderPanel).join('');
+            } else if (currentView === 'details') {
+                if(data.pageProps && data.pageProps.islandData) container.innerHTML = renderIslandDetails(data.pageProps.islandData);
+                else container.innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load island details.</div>';
+            } else if (currentView === 'creator') {
+                 if(data.success && data.creatorData) container.innerHTML = renderCreatorProfile(data);
+                 else container.innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load creator profile.</div>';
             }
         }
-
-        // --- Core Logic: Fetching & Global Timer ---
 
         function setStatus(type) {
             const el = document.getElementById('status-indicator');
@@ -873,56 +1030,17 @@
             }
         }
 
-        async function tryFetch(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return await response.json();
-            } catch (e) {
-                console.warn(`Fetch failed for ${url}`, e);
-                return null;
-            }
-        }
-
-        async function performFetch(targetUrl) {
-            setStatus('loading');
-            const proxies = getProxies(targetUrl);
-            
-            let data = null;
-            
-            for (const url of proxies) {
-                data = await tryFetch(url);
-                if (data) break;
-            }
-
-            if (data) {
-                if (data.contents) {
-                    try { data = JSON.parse(data.contents); } catch (e) {}
-                }
-                return data;
-            } else {
-                setStatus('error');
-                return null;
-            }
-        }
-
-        // --- Fetching Functions (with Routing) ---
-        
         async function fetchHomeData(pushState = true) {
             currentView = 'home';
             currentCategoryName = '';
             currentIslandCode = '';
-            
             if (pushState) updateURL('/discovery');
-            
             const fullUrl = NEXT_DATA_API + HOME_ENDPOINT;
             const data = await performFetch(fullUrl);
-            
             if (data) {
                 localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(data));
                 const now = Date.now();
                 localStorage.setItem(STORAGE_KEY_TIMESTAMP, now.toString());
-
                 updateLastUpdatedTime(now);
                 setStatus('success');
                 renderApp(data);
@@ -937,145 +1055,51 @@
             currentView = 'category';
             currentCategoryName = surfaceName;
             currentIslandCode = '';
-            
             if (pushState) updateURL('/creative', { tag: surfaceName });
-            
             const fullUrl = `${NEXT_DATA_API}/discover/${surfaceName}.json?surfaceName=${surfaceName}`;
-            
-            document.getElementById('main-container').innerHTML = `
-             <div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse">
-                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i>
-                <p>Loading ${surfaceName}...</p>
-            </div>`;
-
+            document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading ${surfaceName}...</p></div>`;
             const data = await performFetch(fullUrl);
-
-            if (data) {
-                setStatus('success');
-                renderApp(data);
-            } else {
-                setStatus('error');
-                document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load category.</div>';
-            }
+            if (data) { setStatus('success'); renderApp(data); }
+            else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load category.</div>'; }
         }
 
         async function viewIsland(code, pushState = true) {
             currentView = 'details';
             currentIslandCode = code;
-            
             if (pushState) updateURL('/island', { code: code });
-            
             const fullUrl = `${NEXT_DATA_API}/creative/${code}.json?islandCode=${code}`;
-
-            document.getElementById('main-container').innerHTML = `
-             <div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse">
-                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i>
-                <p>Loading Island Details...</p>
-            </div>`;
-
+            document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading Island Details...</p></div>`;
             const data = await performFetch(fullUrl);
-
-            if (data) {
-                setStatus('success');
-                renderApp(data);
-            } else {
-                setStatus('error');
-                document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load island details.</div>';
-            }
+            if (data) { setStatus('success'); renderApp(data); }
+            else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load island details.</div>'; }
         }
 
         async function viewCreator(accountId, pushState = true) {
             if(!accountId) return;
             currentView = 'creator';
             currentCreatorId = accountId;
-
-            if (pushState) updateURL('/creator', { name: accountId }); // using 'name' param for ID as requested
-
+            if (pushState) updateURL('/creator', { name: accountId });
             const fullUrl = `${BACKEND_API}/creator/${accountId}`;
-            
-            document.getElementById('main-container').innerHTML = `
-             <div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse">
-                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i>
-                <p>Loading Creator Profile...</p>
-            </div>`;
-
+            document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading Creator Profile...</p></div>`;
             const data = await performFetch(fullUrl);
-            
-            if (data) {
-                setStatus('success');
-                renderApp(data);
-            } else {
-                setStatus('error');
-                document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load creator.</div>';
-            }
-        }
-
-        function resetToHome(pushState = true) {
-            if (pushState) {
-                 updateURL('/discovery');
-            }
-            currentView = 'home';
-            const savedDataStr = localStorage.getItem(STORAGE_KEY_DATA);
-            if (savedDataStr) {
-                renderApp(JSON.parse(savedDataStr));
-            } else {
-                fetchHomeData(false); 
-            }
-        }
-
-        // --- Timer Logic ---
-        function updateTimerDisplay(msRemaining) {
-            if (currentView !== 'home') {
-                 document.getElementById('timer-text').textContent = "--:--";
-                 document.getElementById('timer-bar').style.width = "0%";
-                 return;
-            }
-
-            const secondsRemaining = Math.max(0, Math.floor(msRemaining / 1000));
-            const minutes = Math.floor(secondsRemaining / 60);
-            const seconds = secondsRemaining % 60;
-            
-            const textEl = document.getElementById('timer-text');
-            textEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            const barEl = document.getElementById('timer-bar');
-            const percentage = (msRemaining / REFRESH_INTERVAL_MS) * 100;
-            barEl.style.width = `${percentage}%`;
-
-            if (msRemaining < 10000) {
-                textEl.classList.add('text-red-500', 'animate-pulse');
-                textEl.classList.remove('text-yellow-400');
-                barEl.classList.replace('from-yellow-400', 'from-red-500');
-            } else {
-                textEl.classList.remove('text-red-500', 'animate-pulse');
-                textEl.classList.add('text-yellow-400');
-                barEl.classList.replace('from-red-500', 'from-yellow-400');
-            }
+            if (data) { setStatus('success'); renderApp(data); }
+            else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load creator.</div>'; }
         }
 
         async function checkAndSchedule() {
-            // On initial load, we parse the URL to decide what to fetch
+            await runSecurityChecks();
             handleRouting(); 
-
-            // Setup Timer Loop (Runs always, but only updates UI if on Home)
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 if (currentView !== 'home') return;
-                
                 const now = Date.now();
                 const lastFetchStr = localStorage.getItem(STORAGE_KEY_TIMESTAMP);
                 let lastFetch = lastFetchStr ? parseInt(lastFetchStr) : 0;
                 let timeElapsed = now - lastFetch;
                 const remaining = REFRESH_INTERVAL_MS - timeElapsed; 
-
-                if (remaining <= 0) {
-                    // Time to refresh home data
-                    fetchHomeData(false); 
-                } else {
-                    updateTimerDisplay(remaining);
-                }
+                if (remaining <= 0) fetchHomeData(false); 
+                else updateTimerDisplay(remaining);
             }, 1000);
-            
             const now = Date.now();
             const lastFetchStr = localStorage.getItem(STORAGE_KEY_TIMESTAMP);
             let lastFetch = lastFetchStr ? parseInt(lastFetchStr) : 0;
@@ -1083,22 +1107,7 @@
             updateTimerDisplay(Math.max(0, REFRESH_INTERVAL_MS - timeElapsed));
         }
 
-        function forceRefresh() {
-             if (currentView === 'home') {
-                localStorage.removeItem(STORAGE_KEY_TIMESTAMP);
-                fetchHomeData(false);
-            } else if (currentView === 'category' && currentCategoryName) {
-                fetchCategoryData(currentCategoryName, false);
-            } else if (currentView === 'details' && currentIslandCode) {
-                viewIsland(currentIslandCode, false);
-            } else if (currentView === 'creator' && currentCreatorId) {
-                viewCreator(currentCreatorId, false);
-            }
-        }
-
-        // Start App
         window.addEventListener('DOMContentLoaded', checkAndSchedule);
-
     </script>
 </body>
 </html>
