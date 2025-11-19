@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fortnite Discovery Browser</title>
     <meta name="description" content="Fortnite Discovery Browser - Fast, Secure, Reliable">
-    <meta name="robots" content="noindex, nofollow"> <!-- Anti-Crawler -->
+    <meta name="robots" content="noindex, nofollow">
     
-    <!-- Tailwind CSS (Corrected) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- FontAwesome (CDN via Cloudflare) -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Chart.js for Metrics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
@@ -33,17 +34,22 @@
                             dark: '#0B0E14',
                             card: '#151A23',
                             accent: '#FACC15', // Yellow
-                            highlight: '#3B82F6' // Blue
+                            highlight: '#3B82F6',
+                            play: '#00E701'
                         }
                     },
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-out',
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
                     },
                     keyframes: {
                         fadeIn: {
                             '0%': { opacity: '0', transform: 'translateY(10px)' },
                             '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
                         }
                     }
                 }
@@ -52,24 +58,12 @@
     </script>
 
     <style>
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0B0E14; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569; 
-        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0B0E14; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        .card-hover {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .card-hover:hover {
             transform: translateY(-6px) scale(1.01);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
@@ -77,7 +71,7 @@
         }
         
         .glass-nav {
-            background: rgba(11, 14, 20, 0.85);
+            background: rgba(11, 14, 20, 0.95);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
         }
@@ -88,121 +82,68 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        
-        .line-clamp-3 {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
 
-        /* Progress Bar Animation */
-        #timer-bar {
-            transition: width 1s linear;
-        }
-        
         .category-active {
             border-color: #FACC15 !important;
             background-color: #1e293b !important;
         }
-
-        /* Security Overlay Styles */
-        #security-overlay {
-            position: fixed;
-            inset: 0;
-            background-color: #0B0E14;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.3s ease;
-        }
         
-        /* Prevent text selection for basic protection */
-        body.protected {
-            user-select: none;
-            -webkit-user-select: none;
+        /* Custom Alert Container */
+        #alert-container {
+            position: fixed; bottom: 24px; right: 24px; z-index: 100;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
         }
+        .custom-alert { pointer-events: auto; }
     </style>
 </head>
-<body class="bg-fn-dark text-white min-h-screen font-sans selection:bg-yellow-500/30 protected" oncontextmenu="return false;">
-
-    <!-- Security Gateway Overlay -->
-    <div id="security-overlay">
-        <div class="text-center max-w-md px-6">
-            <div class="mb-6 relative">
-                <div class="w-16 h-16 border-4 border-slate-700 border-t-yellow-400 rounded-full animate-spin mx-auto"></div>
-                <i class="fa-solid fa-shield-halved absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-slate-500"></i>
-            </div>
-            <h2 class="text-2xl font-display font-bold text-white mb-2">Checking Connection</h2>
-            <p class="text-slate-400 text-sm mb-6" id="security-status">Verifying browser integrity...</p>
-            
-            <div class="flex flex-col gap-2 text-xs text-slate-500">
-                <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded border border-slate-700/50" id="row-ddos">
-                    <span>DDoS Protection</span>
-                    <span class="text-green-400" id="icon-ddos"><i class="fa-solid fa-check"></i></span>
-                </div>
-                <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded border border-slate-700/50" id="row-adblock">
-                    <span>Adblock Check</span>
-                    <span id="icon-adblock" class="text-yellow-400"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-                </div>
-                <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded border border-slate-700/50" id="row-bot">
-                    <span>Bot Detection</span>
-                    <span id="icon-bot" class="text-yellow-400"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-                </div>
-            </div>
-            
-            <div id="security-error" class="hidden mt-6 bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded text-sm font-bold">
-                <i class="fa-solid fa-triangle-exclamation mr-2"></i> <span id="error-msg">Access Denied</span>
-            </div>
-            
-            <div id="skip-btn" class="hidden mt-4">
-                <button onclick="bypassSecurity()" class="text-xs text-slate-500 hover:text-slate-300 underline">Skip Checks (Dev)</button>
-            </div>
-        </div>
-    </div>
+<body class="bg-fn-dark text-white min-h-screen font-sans selection:bg-yellow-500/30">
 
     <!-- Navbar -->
-    <nav class="sticky top-0 z-50 glass-nav border-b border-slate-800/50 shadow-lg">
+    <nav class="sticky top-0 z-50 glass-nav border-b border-slate-800/50 shadow-lg transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 py-3">
-            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                 <!-- Logo -->
                 <div class="flex items-center gap-3 cursor-pointer group" onclick="resetToHome(true)">
-                    <div class="bg-gradient-to-br from-yellow-400 to-orange-500 text-black p-2 rounded-lg shadow-lg shadow-yellow-500/20 group-hover:scale-110 transition-transform">
+                    <div class="bg-gradient-to-br from-yellow-400 to-orange-500 text-black p-2 rounded-lg shadow-lg shadow-yellow-500/20 group-hover:scale-110 transition-transform duration-300">
                         <i class="fa-solid fa-gamepad text-xl"></i>
                     </div>
                     <h1 class="text-2xl font-display font-bold tracking-wider uppercase text-white leading-none">
-                        FN<span class="text-yellow-400">Zone</span><br>
+                        FN<span class="text-yellow-400">TOOLS</span><br>
                         <span class="text-xs text-slate-400 tracking-[0.2em] font-sans font-normal">DISCOVERY</span>
                     </h1>
                 </div>
 
-                <!-- Controls & Timer -->
-                <div class="flex items-center gap-4 w-full sm:w-auto justify-end">
-                    <!-- Info Display -->
-                    <div class="hidden md:flex flex-col items-end mr-4 text-xs text-slate-500">
-                        <div class="flex items-center gap-1">
-                            <i class="fa-regular fa-clock"></i>
-                            <span>Updated:</span>
-                            <span id="last-updated-time" class="text-slate-300 font-mono">--:--</span>
+                <!-- Global Stats -->
+                <div class="hidden md:flex items-center gap-3">
+                    <!-- Version Badge -->
+                    <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner" title="Game Version">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">VER <span id="game-version" class="text-yellow-400 ml-1">--.--</span></span>
+                    </div>
+                    
+                    <!-- Player Count -->
+                    <div class="flex items-center gap-2 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700 shadow-inner min-w-[140px] justify-center">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                        <div class="flex flex-col leading-none">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Total Playing</span>
+                            <span id="global-player-count" class="text-sm font-mono text-white font-bold transition-all duration-500">Loading...</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Timer Display -->
-                    <div class="flex flex-col items-end mr-2">
-                        <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
-                            <span>REFRESH:</span>
-                            <span id="timer-text" class="text-yellow-400 font-bold">05:00</span>
-                        </div>
-                        <!-- Progress Bar Container -->
-                        <div class="w-32 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
-                            <div id="timer-bar" class="h-full bg-gradient-to-r from-yellow-400 to-orange-500 w-full rounded-full"></div>
-                        </div>
+                <!-- Controls (Cleaned up) -->
+                <div class="flex items-center gap-4 w-full md:w-auto justify-end">
+                    <!-- Last Updated Info -->
+                    <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/50 px-3 py-1.5 rounded-lg border border-slate-800">
+                        <i class="fa-regular fa-clock text-slate-400"></i>
+                        <span class="hidden sm:inline">Updated:</span>
+                        <span id="last-updated-text" class="text-slate-300 font-mono font-bold">Just now</span>
                     </div>
 
                     <!-- Status Badge -->
-                    <div class="text-xs font-bold px-2 py-2 rounded-full border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm flex items-center justify-center shadow-sm w-8 h-8" id="status-indicator" title="Status">
+                    <div class="w-8 h-8 rounded-full border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm flex items-center justify-center shadow-sm" id="status-indicator" title="Status">
                         <span class="relative flex h-2.5 w-2.5">
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
                           <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-500"></span>
@@ -210,7 +151,7 @@
                     </div>
                     
                     <!-- Manual Refresh Button -->
-                    <button onclick="forceRefresh()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors" title="Force Refresh Now">
+                    <button onclick="forceRefresh()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 active:scale-95" title="Refresh Data">
                         <i class="fa-solid fa-rotate-right"></i>
                     </button>
                 </div>
@@ -230,12 +171,10 @@
     <footer class="bg-black/20 backdrop-blur-lg text-slate-500 py-8 text-center border-t border-slate-800 mt-12 select-none">
         <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="text-xs text-slate-600 text-left">
-                 <p class="font-medium text-slate-700">Not affiliated with Epic Games.</p>
+                 <!-- Empty -->
             </div>
-            
-            <!-- Cloudflare / Security Badge Simulation -->
             <div class="flex items-center gap-4">
-                 <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50 hover:bg-slate-700 cursor-help" title="DDoS Protection Active">
+                 <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50 hover:bg-slate-700 cursor-help transition-colors" title="DDoS Protection Active">
                     <i class="fa-solid fa-shield-halved text-orange-400 text-xs"></i>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Secure</span>
                 </div>
@@ -247,120 +186,64 @@
         </div>
     </footer>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 border border-slate-700 text-white px-5 py-3 rounded-xl shadow-2xl transform translate-y-32 transition-all duration-500 z-50 flex items-center gap-3 backdrop-blur-md">
-        <div class="bg-green-500/20 text-green-400 p-2 rounded-lg">
-            <i class="fa-solid fa-check"></i>
-        </div>
-        <div>
-            <p class="font-bold text-sm">Code Copied!</p>
-            <p class="text-xs text-slate-400">Ready to paste in Fortnite.</p>
-        </div>
-    </div>
-
-    <!-- Bait for Adblocker Detection -->
-    <div id="ad-banner" class="ad-banner adsbox" style="position:absolute; top:-999px; left:-999px; width:1px; height:1px; background:transparent;"></div>
+    <!-- Custom Alert Container -->
+    <div id="alert-container"></div>
 
     <script>
-        // --- Anti-DevTools & Protection ---
-        
-        // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
-        document.addEventListener('keydown', function(e) {
-            if (
-                e.keyCode === 123 || // F12
-                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
-                (e.ctrlKey && e.keyCode === 85) // Ctrl+U
-            ) {
-                e.preventDefault();
-            }
-        });
-
-        // --- Security Checks ---
-        let securityCheckPassed = false;
-
-        function bypassSecurity() {
-            const overlay = document.getElementById('security-overlay');
-            if(overlay) overlay.style.display = 'none';
-            securityCheckPassed = true;
-            checkAndSchedule();
-        }
-        
-        async function runSecurityChecks() {
-            if (securityCheckPassed) return;
-
-            const statusEl = document.getElementById('security-status');
-            const adblockEl = document.getElementById('icon-adblock');
-            const botEl = document.getElementById('icon-bot');
-            const overlay = document.getElementById('security-overlay');
-            const errorBox = document.getElementById('security-error');
-            const errorMsg = document.getElementById('error-msg');
+        // --- Animation Utilities ---
+        function animateValue(obj, start, end, duration) {
+            if (!obj) return;
+            // Ensure inputs are numbers
+            start = parseInt(String(start).replace(/,/g, '')) || 0;
+            end = parseInt(String(end).replace(/,/g, '')) || 0;
             
-            // Safety timeout to prevent infinite loading
-            const safetyTimeout = setTimeout(() => {
-                if (!securityCheckPassed) {
-                    console.warn("Security check timed out, proceeding safely...");
-                    bypassSecurity();
-                }
-            }, 5000); // 5 seconds max
-
-            // Update Helper
-            const updateStep = (rowId, iconId) => {
-                const row = document.getElementById(rowId);
-                const icon = document.getElementById(iconId);
-                if(row) {
-                    row.classList.replace('border-slate-700/50', 'border-green-500/30');
-                    row.classList.replace('bg-slate-800/50', 'bg-green-500/10');
-                }
-                if(icon) icon.innerHTML = '<i class="fa-solid fa-check text-green-400"></i>';
-            };
-
-            try {
-                // 1. DDoS (Simulated Instant)
-                updateStep('row-ddos', 'icon-ddos');
-
-                // 2. Adblock Detection (Fixed Logic)
-                await new Promise(r => setTimeout(r, 300));
-                const adBait = document.getElementById('ad-banner');
-                const adStyles = adBait ? window.getComputedStyle(adBait) : null;
-                
-                if (!adBait || (adStyles && (adStyles.display === 'none' || adStyles.visibility === 'hidden'))) {
-                     // Detected - Warn but don't block for now
-                     if(adblockEl) adblockEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-yellow-400"></i>';
-                } else {
-                    updateStep('row-adblock', 'icon-adblock');
-                }
-
-                // 3. Bot Detection (Headless Check - Fast)
-                await new Promise(r => setTimeout(r, 300));
-                const isHeadless = navigator.webdriver || !navigator.languages || navigator.languages.length === 0;
-                if (isHeadless) {
-                    if(botEl) botEl.innerHTML = '<i class="fa-solid fa-xmark text-red-500"></i>';
-                } else {
-                    updateStep('row-bot', 'icon-bot');
-                }
-                
-                // 3. Finish (Fast fade out)
-                statusEl.textContent = "Connection Secure";
-                statusEl.classList.add('text-green-400');
-                await new Promise(r => setTimeout(r, 400));
-                
-                clearTimeout(safetyTimeout);
-                overlay.style.opacity = '0';
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    securityCheckPassed = true;
-                    checkAndSchedule(); 
-                }, 300);
-
-            } catch (e) {
-                console.error("Security Check Error:", e);
-                bypassSecurity();
+            if (start === end) {
+                obj.innerHTML = new Intl.NumberFormat('en-US').format(end);
+                return;
             }
+
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Easing function for smooth effect
+                const easeOutQuad = (t) => t * (2 - t);
+                const easeProgress = easeOutQuad(progress);
+                
+                const current = Math.floor(easeProgress * (end - start) + start);
+                obj.innerHTML = new Intl.NumberFormat('en-US').format(current);
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = new Intl.NumberFormat('en-US').format(end);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // --- Custom Alert System ---
+        function showAlert(message, type = 'success', duration = 3000) {
+            const container = document.getElementById('alert-container');
+            const styles = {
+                success: { bg: 'bg-slate-800', border: 'border-green-500', icon: 'fa-circle-check', text: 'text-green-400' },
+                error: { bg: 'bg-red-900/90', border: 'border-red-500', icon: 'fa-circle-xmark', text: 'text-white' },
+                info: { bg: 'bg-slate-800', border: 'border-blue-500', icon: 'fa-circle-info', text: 'text-blue-400' },
+                warning: { bg: 'bg-slate-800', border: 'border-yellow-500', icon: 'fa-triangle-exclamation', text: 'text-yellow-400' }
+            };
+            const style = styles[type] || styles.info;
+            const alert = document.createElement('div');
+            alert.className = `custom-alert ${style.bg} border-l-4 ${style.border} text-white px-6 py-4 rounded shadow-2xl flex items-center gap-3 min-w-[300px] transform translate-x-full transition-all duration-300 animate-slide-up backdrop-blur-md`;
+            alert.innerHTML = `<i class="fa-solid ${style.icon} ${style.text} text-xl"></i><div class="flex-1"><p class="font-bold text-sm capitalize">${type}</p><p class="text-xs text-slate-300">${message}</p></div>`;
+            container.appendChild(alert);
+            requestAnimationFrame(() => { alert.classList.remove('translate-x-full'); });
+            setTimeout(() => { alert.classList.add('opacity-0', 'translate-y-4'); setTimeout(() => alert.remove(), 300); }, duration);
         }
 
         // --- Configuration ---
         const NEXT_DATA_API = "https://fnzone.es/_next/data/uia3PTQJwe47bgy4hnG2c/en";
         const BACKEND_API = "https://fnzone.es/api/backend/v2";
+        const GLOBAL_STATS_API = "https://fnzone.es/api/backend/v1/player-count/live";
         const METRICS_API_BASE = "https://api.fortnite.com/ecosystem/v1/islands";
         const HOME_ENDPOINT = "/discover.json";
         
@@ -375,42 +258,28 @@
         }
         
         const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
-        
-        const STORAGE_KEY_DATA = 'fn_discovery_data_v6';
-        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v6';
+        const STORAGE_KEY_DATA = 'fn_discovery_data_v20';
+        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v20';
 
-        // --- State ---
         let timerInterval;
         let currentView = 'home'; 
         let currentCategoryName = '';
         let currentIslandCode = '';
         let currentCreatorId = '';
         let chartInstance = null;
-        
         window.cachedSurfaces = [];
+        
+        let currentGlobalPlayers = 0;
 
         // --- Sample Data ---
         const SAMPLE_DATA = {
             "pageProps": {
-                "discoveryData": [
-                    {
-                        "panelName": "Battle_Royales_ByEpic_new",
-                        "panelDisplayName": { "en": "Battle Royales by Epic" },
-                        "panelSubtitle": { "en": "BR: 20 min | Reload: 15 min | Blitz: 5 min" },
-                        "firstPage": [
-                            { "islandCode": "set_br_playlists", "islandTitle": "Battle Royale", "creatorSlug": "Epic", "smallImage": "https://cdn2.unrealengine.com/cdn-uploader-FNBR_38-00_C6MS2_BR_DiscoverPlaylistTile_-480x270-1f80c40f.jpg", "globalCCU": 131632 },
-                            { "islandCode": "set_habanero_blastberry_playlists", "islandTitle": "Reload Ranked", "creatorSlug": "Epic", "smallImage": "https://cdn2.unrealengine.com/en-fnbr-37-30-reload-rankedreload-build-discoverplaylisttile-480x270-480x270-d2341c19bde6.jpg", "globalCCU": 46769 }
-                        ]
-                    }
-                ],
-                "searchSurfaces": [
-                     { "displayName": "1v1", "surfaceHref": "1v1", "iconImage": "https://cdn2.unrealengine.com/icon-1v1-32x32-fe198a29557a.png" }
-                ]
+                "discoveryData": [],
+                "searchSurfaces": []
             }
         };
 
         // --- Helper Functions ---
-
         function formatCCU(num) {
             if (!num) return '0';
             if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -423,84 +292,61 @@
         }
 
         function formatDate(dateString) {
-            if (!dateString) return 'Unknown';
+            if (!dateString) return '';
             return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         }
 
         function sanitizeTag(tag) {
             const lower = tag.toLowerCase().trim();
-            const map = {
-                'free for all': 'ffa',
-                'prop hunt': 'prophunt',
-                'zone wars': 'zonewars',
-                'box fight': 'boxfight',
-                'death run': 'deathrun',
-                'edit course': 'editcourse',
-                'hide and seek': 'hideandseek',
-                'open world': 'openworld',
-                'team deathmatch': 'teamdeathmatch',
-                'battle royale': 'battleroyale',
-                'gun game': 'gungame'
-            };
+            const map = { 'free for all': 'ffa', 'prop hunt': 'prophunt', 'zone wars': 'zonewars', 'box fight': 'boxfight', 'death run': 'deathrun', 'edit course': 'editcourse', 'hide and seek': 'hideandseek', 'open world': 'openworld', 'team deathmatch': 'teamdeathmatch', 'battle royale': 'battleroyale', 'gun game': 'gungame' };
             return map[lower] || lower.replace(/\s+/g, '');
         }
 
-        function copyCode(code, event) {
-            if(event) event.stopPropagation(); 
+        function getSafeString(val) {
+            if (typeof val === 'string') return val;
+            if (val && typeof val === 'object') {
+                if (val.en) return val.en;
+                const keys = Object.keys(val);
+                if (keys.length > 0) return val[keys[0]];
+            }
+            return '';
+        }
+
+        function copyToClipboard(text, event) {
+            if(event) event.stopPropagation();
             const textArea = document.createElement("textarea");
-            textArea.value = code;
+            textArea.value = text;
             document.body.appendChild(textArea);
             textArea.select();
             try {
                 document.execCommand('copy');
-                const toast = document.getElementById('toast');
-                toast.classList.remove('translate-y-32');
-                setTimeout(() => toast.classList.add('translate-y-32'), 2500);
+                showAlert('Code copied to clipboard!', 'success');
             } catch (err) {
-                console.error('Fallback copy failed', err);
+                showAlert('Failed to copy code.', 'error');
             }
             document.body.removeChild(textArea);
         }
 
+        // --- Updated Time Logic (Just X mins ago) ---
         function updateLastUpdatedTime(timestamp) {
-            const date = new Date(parseInt(timestamp));
-            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const el = document.getElementById('last-updated-time');
-            if (el) el.textContent = timeStr;
-        }
-
-        // --- Definitions Restored ---
-
-        function updateTimerDisplay(msRemaining) {
-            if (currentView !== 'home') {
-                 const timerText = document.getElementById('timer-text');
-                 const timerBar = document.getElementById('timer-bar');
-                 if(timerText) timerText.textContent = "--:--";
-                 if(timerBar) timerBar.style.width = "0%";
-                 return;
+            const el = document.getElementById('last-updated-text');
+            if (!el) return;
+            
+            if (!timestamp) {
+                el.innerText = "";
+                return;
             }
 
-            const secondsRemaining = Math.max(0, Math.floor(msRemaining / 1000));
-            const minutes = Math.floor(secondsRemaining / 60);
-            const seconds = secondsRemaining % 60;
-            
-            const textEl = document.getElementById('timer-text');
-            const barEl = document.getElementById('timer-bar');
-            
-            if(textEl) textEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            if(barEl) {
-                const percentage = (msRemaining / REFRESH_INTERVAL_MS) * 100;
-                barEl.style.width = `${percentage}%`;
-                
-                if (msRemaining < 10000) {
-                    textEl.classList.add('text-red-500', 'animate-pulse');
-                    textEl.classList.remove('text-yellow-400');
-                    barEl.classList.replace('from-yellow-400', 'from-red-500');
-                } else {
-                    textEl.classList.remove('text-red-500', 'animate-pulse');
-                    textEl.classList.add('text-yellow-400');
-                    barEl.classList.replace('from-red-500', 'from-yellow-400');
-                }
+            const now = Date.now();
+            const diffMs = now - parseInt(timestamp);
+            const diffMins = Math.floor(diffMs / 60000);
+
+            if (diffMins < 1) {
+                el.innerText = "Just now";
+            } else if (diffMins === 1) {
+                el.innerText = "1 min ago";
+            } else {
+                el.innerText = `${diffMins} mins ago`;
             }
         }
 
@@ -509,13 +355,14 @@
             for (const [key, value] of Object.entries(params)) {
                 if (value) searchParams.set(key, value);
             }
-            window.location.hash = path + (searchParams.toString() ? '?' + searchParams.toString() : '');
+            const newHash = path + (searchParams.toString() ? '?' + searchParams.toString() : '');
+            if(window.location.hash.substring(1) !== newHash) {
+                window.location.hash = newHash;
+            }
         }
 
         function resetToHome(pushState = true) {
-            if (pushState) {
-                 updateURL('/discovery');
-            }
+            if (pushState) updateURL('/discovery');
             currentView = 'home';
             const savedDataStr = localStorage.getItem(STORAGE_KEY_DATA);
             if (savedDataStr) {
@@ -552,41 +399,73 @@
             } else if (currentView === 'creator' && currentCreatorId) {
                 viewCreator(currentCreatorId, false);
             }
+             fetchGlobalStats();
+        }
+
+        // --- Error Pages ---
+        function renderErrorPage(title, message, isOffline = false) {
+            const container = document.getElementById('main-container');
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
+                    <div class="mb-6 relative">
+                        <i class="fa-solid ${isOffline ? 'fa-wifi' : 'fa-circle-exclamation'} text-6xl text-slate-700"></i>
+                        ${isOffline ? '<i class="fa-solid fa-slash text-4xl text-red-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></i>' : ''}
+                    </div>
+                    <h1 class="text-4xl font-display font-bold text-white mb-4 tracking-wide">${title}</h1>
+                    <p class="text-slate-400 max-w-md mb-8">${message}</p>
+                    <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-full border border-slate-700 transition-all flex items-center gap-2 group">
+                        <i class="fa-solid fa-rotate-right group-hover:rotate-180 transition-transform duration-500"></i>
+                        Try Again
+                    </button>
+                </div>
+            `;
         }
 
         // --- Routing & API ---
 
         function handleRouting() {
             let hash = window.location.hash.substring(1);
-            if (!hash) hash = '/discovery';
-            if (!hash.startsWith('/')) hash = '/discovery';
+            if (!hash || hash === '/') {
+                 hash = '/discovery';
+            }
+
+            if (!navigator.onLine) {
+                renderErrorPage("No Internet Connection", "Please check your network settings and try again.", true);
+                return;
+            }
 
             const [path, search] = hash.split('?');
             const params = new URLSearchParams(search);
 
             if (path === '/discovery') {
-                if (currentView !== 'home') {
-                     fetchHomeData(false); 
-                }
+                if (currentView !== 'home') fetchHomeData(false); 
             } 
             else if (path === '/island') {
                 const code = params.get('code');
                 if (code) viewIsland(code, false); 
+                else resetToHome();
             } 
             else if (path === '/creator') {
                 const id = params.get('name'); 
                 if (id) viewCreator(id, false);
+                else resetToHome();
             } 
             else if (path === '/creative') {
                 const tag = params.get('tag');
                 if (tag) fetchCategoryData(tag, false);
+                else resetToHome();
             } 
+            else if (path === '/error') {
+                renderErrorPage("Page Not Found", "The requested resource could not be found.");
+            }
             else {
-                 if (currentView !== 'home') resetToHome(false);
+                 if (currentView !== 'home') resetToHome(true);
             }
         }
 
         window.addEventListener('hashchange', handleRouting);
+        window.addEventListener('online', () => { showAlert('Back Online!', 'success'); handleRouting(); });
+        window.addEventListener('offline', () => { showAlert('Connection Lost', 'error'); renderErrorPage("No Internet Connection", "You are currently offline.", true); });
 
         async function tryFetch(url) {
             try {
@@ -602,24 +481,36 @@
         async function performFetch(targetUrl) {
             setStatus('loading');
             const proxies = getProxies(targetUrl);
-            
             let data = null;
-            
             for (const url of proxies) {
                 data = await tryFetch(url);
                 if (data) break;
             }
-
             if (data) {
-                if (data.contents) {
-                    try { data = JSON.parse(data.contents); } catch (e) {}
-                }
+                if (data.contents) { try { data = JSON.parse(data.contents); } catch (e) {} }
                 return data;
             } else {
                 setStatus('error');
                 return null;
             }
         }
+
+        // --- Fetch Global Player Count ---
+        async function fetchGlobalStats() {
+            const data = await performFetch(GLOBAL_STATS_API);
+            const elCount = document.getElementById('global-player-count');
+            const elVer = document.getElementById('game-version');
+
+            if(data) {
+                 if (data.playingNow && elCount) {
+                     const currentVal = parseInt(elCount.innerText.replace(/,/g, '')) || 0;
+                     animateValue(elCount, currentVal, data.playingNow, 1500);
+                 }
+                 if (data.version && elVer) elVer.innerText = data.version;
+            }
+        }
+
+        // --- Chart Logic (Fixed with Real Time) ---
 
         async function loadIslandMetrics(code) {
             const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -629,27 +520,30 @@
             
             const canvas = document.getElementById('ccuChart');
             const liveDisplay = document.getElementById('live-ccu-display');
+            const liveValDisplay = document.getElementById('live-val');
             
             if (data && data.intervals && data.intervals.length > 0) {
                 const validPoints = data.intervals.filter(p => p.value !== null);
                 
-                if (liveDisplay && validPoints.length > 0) {
+                // Animate Live Player Count
+                if (liveValDisplay && validPoints.length > 0) {
                      const lastValue = validPoints[validPoints.length - 1].value;
-                     liveDisplay.innerHTML = `
-                        <span class="relative flex h-2.5 w-2.5 mr-2">
-                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                        </span>
-                        ${formatNumber(lastValue)}
-                     `;
+                     const startValue = parseInt(liveValDisplay.innerText.replace(/,/g, '')) || 0;
+                     
+                     // Ensure green dot is present
+                     if (liveDisplay) {
+                         const dot = liveDisplay.querySelector('.relative.flex');
+                         if(!dot) {
+                             // Rebuild html if needed, but usually just update number
+                         }
+                     }
+                     
+                     animateValue(liveValDisplay, startValue, lastValue, 1000);
                 }
 
                 if (canvas) {
                     const ctx = canvas.getContext('2d');
-                    const labels = validPoints.map(p => {
-                        const date = new Date(p.timestamp);
-                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    });
+                    const labels = validPoints.map(p => p.timestamp);
                     const values = validPoints.map(p => p.value);
 
                     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -665,13 +559,14 @@
                         data: {
                             labels: labels,
                             datasets: [{
-                                label: 'Players (CCU)',
+                                label: 'Players',
                                 data: values,
                                 borderColor: '#FACC15',
                                 backgroundColor: gradient,
                                 borderWidth: 2,
                                 pointRadius: 0,
-                                pointHoverRadius: 4,
+                                pointHoverRadius: 6,
+                                pointHoverBackgroundColor: '#FACC15',
                                 fill: true,
                                 tension: 0.4
                             }]
@@ -684,20 +579,38 @@
                                 legend: { display: false },
                                 tooltip: {
                                     backgroundColor: '#1e293b',
-                                    titleColor: '#fff',
+                                    titleColor: '#FACC15',
                                     bodyColor: '#cbd5e1',
                                     borderColor: '#334155',
                                     borderWidth: 1,
                                     displayColors: false,
-                                    callbacks: { label: (c) => 'Players: ' + c.parsed.y }
+                                    titleFont: { family: 'Inter', weight: 'bold', size: 14 },
+                                    bodyFont: { family: 'Inter', size: 13 },
+                                    padding: 12,
+                                    callbacks: {
+                                        title: function(context) {
+                                            // Correct Time parsing using parsed.x (timestamp)
+                                            const timestamp = context[0].parsed.x;
+                                            if (!timestamp) return ' Time';
+                                            const date = new Date(timestamp);
+                                            // Return formatted time e.g., 14:30
+                                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                        },
+                                        label: (c) => 'Players: ' + formatNumber(c.parsed.y)
+                                    }
                                 }
                             },
                             scales: {
-                                x: { display: false },
+                                x: { 
+                                    type: 'time',
+                                    time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+                                    grid: { display: false, color: '#334155' },
+                                    ticks: { color: '#64748b', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
+                                },
                                 y: {
                                     border: { display: false },
-                                    grid: { color: '#334155', drawBorder: false },
-                                    ticks: { color: '#94a3b8', maxTicksLimit: 5 }
+                                    grid: { color: '#1e293b', drawBorder: false },
+                                    ticks: { color: '#64748b', maxTicksLimit: 5, callback: function(value) { return formatNumber(value); } }
                                 }
                             }
                         }
@@ -707,14 +620,17 @@
             }
         }
 
+        // --- Rendering ---
+
         function createCard(island) {
-            const title = island.islandTitle || island.title || 'Unknown Title';
+            const title = getSafeString(island.islandTitle || island.title) || ' Title';
             const code = island.islandCode || 'N/A';
-            const rawImage = island.smallImage || island.image || island.backgroundImage || 'https://via.placeholder.com/480x270/151A23/ffffff?text=No+Image';
+            const rawImage = getSafeString(island.smallImage || island.image || island.backgroundImage) || 'https://via.placeholder.com/480x270/151A23/ffffff?text=No+Image';
             const cleanImage = rawImage.split('?')[0];
             const ccu = formatCCU(island.globalCCU);
             const creator = island.creatorSlug || '';
 
+            // Remove code display from card footer
             return `
                 <div class="bg-fn-card rounded-2xl overflow-hidden card-hover group relative border border-slate-800 flex flex-col h-full cursor-pointer" onclick="viewIsland('${code}', true)">
                     <div class="relative aspect-video overflow-hidden bg-slate-900">
@@ -724,20 +640,12 @@
                             <span class="relative flex h-1.5 w-1.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span></span>
                             ${ccu}
                         </div>
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
-                            <button onclick="copyCode('${code}', event)" class="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-2.5 px-6 rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 shadow-[0_0_15px_rgba(250,204,21,0.5)] flex items-center gap-2">
-                                <i class="fa-regular fa-copy"></i> Copy Code
-                            </button>
-                        </div>
                     </div>
                     <div class="p-4 flex-1 flex flex-col justify-between relative z-10">
                         <div>
                             <h3 class="font-display font-bold text-lg leading-tight mb-1.5 text-white group-hover:text-yellow-400 transition-colors line-clamp-1" title="${title}">${title}</h3>
-                            ${creator ? `<div class="flex items-center gap-1 text-slate-400 text-xs mb-3"><i class="fa-solid fa-user-astronaut text-slate-600"></i><span class="text-slate-400 font-medium hover:text-slate-200 transition-colors">${creator}</span></div>` : '<div class="mb-3"></div>'}
-                        </div>
-                        <div class="mt-auto pt-3 border-t border-slate-800/50 flex justify-between items-center">
-                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Code</span>
-                            <span class="text-xs font-mono font-bold text-slate-300 bg-slate-900/80 border border-slate-700/50 px-2 py-1 rounded select-all cursor-pointer hover:bg-slate-800 hover:text-yellow-400 transition-colors" onclick="copyCode('${code}', event)">${code}</span>
+                            <!-- Creator name is now just text, clicking it triggers the card action (viewIsland) -->
+                            ${creator ? `<div class="flex items-center gap-1 text-slate-400 text-xs mb-3"><i class="fa-solid fa-user-astronaut text-slate-600"></i><span class="font-medium">${creator}</span></div>` : '<div class="mb-3"></div>'}
                         </div>
                     </div>
                 </div>
@@ -748,7 +656,9 @@
             if (!window.cachedSurfaces) window.cachedSurfaces = surfaces;
             if (!surfaces || surfaces.length === 0) return '';
 
-            const items = surfaces.map(surface => {
+            const validSurfaces = surfaces.filter(s => s.displayName && s.iconImage && !s.displayName.toLowerCase().includes('undefined'));
+
+            const items = validSurfaces.map(surface => {
                 const surfaceTag = sanitizeTag(surface.surfaceHref || surface.displayName);
                 const isActive = currentView === 'category' && currentCategoryName === surfaceTag;
                 const activeClass = isActive ? 'category-active' : '';
@@ -758,7 +668,7 @@
                 return `
                 <a href="javascript:void(0)" onclick="fetchCategoryData('${surfaceTag}', true)" class="flex flex-col items-center gap-3 p-4 bg-fn-card rounded-2xl hover:bg-slate-800 hover:border-yellow-400/50 border border-slate-800 transition-all duration-300 group min-w-[110px] shadow-lg hover:shadow-yellow-500/10 ${activeClass}">
                     <div class="w-10 h-10 relative p-1">
-                        <img src="${surface.iconImage}" alt="${surface.displayName}" class="w-full h-full object-contain drop-shadow-md group-hover:scale-110 transition-transform duration-300 filter ${activeGrayscale} group-hover:grayscale-0">
+                        <img src="${surface.iconImage}" alt="${surface.displayName}" class="w-full h-full object-contain drop-shadow-md group-hover:scale-110 transition-transform duration-300 filter ${activeGrayscale} group-hover:grayscale-0" onerror="this.src='https://cdn2.unrealengine.com/icon-1v1-32x32-fe198a29557a.png'">
                     </div>
                     <span class="text-[10px] font-bold ${activeText} group-hover:text-white uppercase tracking-wider text-center group-hover:text-yellow-400 transition-colors">${surface.displayName}</span>
                 </a>
@@ -787,8 +697,8 @@
         function renderPanel(panel) {
             const cardsData = panel.firstPage || panel.links || [];
             if (cardsData.length === 0) return '';
-            const title = panel.panelDisplayName?.en || panel.panelDisplayName || panel.panelName;
-            const subtitle = panel.panelSubtitle?.en || panel.panelSubtitle || '';
+            const title = getSafeString(panel.panelDisplayName || panel.panelName);
+            const subtitle = getSafeString(panel.panelSubtitle);
             const cardsHtml = cardsData.map(createCard).join('');
             return `
                 <section class="animate-fade-in">
@@ -809,22 +719,40 @@
         }
 
         function renderIslandDetails(islandData) {
-            const title = islandData.islandTitle || 'Unknown Island';
-            const code = islandData.mnemonic || 'Unknown Code';
-            const image = islandData.islandImage || 'https://via.placeholder.com/1280x720/151A23/ffffff?text=No+Image';
-            const creator = islandData.creatorSlug || 'Unknown Creator';
+            const title = getSafeString(islandData.islandTitle) || ' Island';
+            const code = islandData.mnemonic || ' Code';
+            const image = getSafeString(islandData.islandImage) || 'https://via.placeholder.com/1280x720/151A23/ffffff?text=No+Image';
+            const creator = islandData.creatorSlug || ' Creator';
             const accountId = islandData.accountId || ''; 
-            const intro = islandData.localizedIntroduction || 'No description available.';
-            const tagline = islandData.localizedTagline || '';
+            const intro = getSafeString(islandData.localizedIntroduction) || 'No description available.';
+            const tagline = getSafeString(islandData.localizedTagline) || '';
             const tags = islandData.descriptionTags || [];
             const version = islandData.gameVersion ? `v${islandData.gameVersion}` : '';
             const releaseDate = formatDate(islandData.firstReleased);
             const updateDate = formatDate(islandData.lastUpdated);
             const maxPlayers = islandData.maxPlayers || '-';
 
+            // Custom Launcher URI
+            const launchUrl = `com.epicgames.launcher://apps/fn%3A4fe75bbc5a674f4f9b356b5c90567da5%3AFortnite?action=launch&silent=true&arg=-IslandOverride%3D${code}`;
+
+            // XP Badge Logic
+            let xpBadge = '';
+            if (islandData.dynamicXp === 'XP') {
+                xpBadge = '<span class="bg-green-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">XP ENABLED</span>';
+            } else if (islandData.dynamicXp === 'Calibrating XP' || islandData.dynamicXp === 'Calibrating') {
+                xpBadge = '<span class="bg-yellow-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">XP CALIBRATING</span>';
+            } else {
+                xpBadge = '<span class="bg-slate-600 text-slate-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">XP DISABLED</span>';
+            }
+
             const tagsHtml = tags.map(tag => 
                 `<button onclick="fetchCategoryData('${sanitizeTag(tag)}', true)" class="px-3 py-1 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-yellow-400 transition-all text-xs font-bold uppercase rounded-full border border-slate-700 cursor-pointer">${tag}</button>`
             ).join('');
+            
+            const ratingsHtml = (islandData.allRatings || []).map(r => {
+                if(!r.ratingImage) return '';
+                return `<img src="${r.ratingImage}" alt="${r.ratingText}" class="h-8 object-contain" title="${r.ratingBoardText}: ${r.ratingText || ''}">`;
+            }).join('');
             
             setTimeout(() => loadIslandMetrics(code), 100);
 
@@ -847,6 +775,7 @@
                                 <div>
                                     <div class="flex flex-wrap gap-2 mb-3">
                                         ${islandData.isUEFN ? '<span class="bg-white text-black px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wide">UEFN</span>' : ''}
+                                        ${xpBadge}
                                         ${version ? `<span class="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${version}</span>` : ''}
                                     </div>
                                     <h1 class="text-4xl md:text-6xl font-display font-bold text-white mb-2 leading-none shadow-sm">${title}</h1>
@@ -856,9 +785,13 @@
                                         <span>Released: ${releaseDate}</span>
                                     </div>
                                 </div>
-                                <div class="flex flex-col items-start md:items-end gap-3">
-                                    <button onclick="copyCode('${code}')" class="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 px-8 rounded-full shadow-[0_0_20px_rgba(250,204,21,0.4)] hover:shadow-[0_0_30px_rgba(250,204,21,0.6)] transition-all transform hover:-translate-y-1 flex items-center gap-3 text-lg">
-                                        <span>${code}</span>
+                                <div class="flex flex-col gap-3 w-full md:w-auto">
+                                    <a href="${launchUrl}" class="bg-fn-play hover:bg-green-400 text-black font-bold py-3 px-8 rounded-full shadow-[0_0_20px_rgba(0,231,1,0.4)] hover:shadow-[0_0_30px_rgba(0,231,1,0.6)] transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg w-full md:w-auto cursor-pointer">
+                                        <i class="fa-solid fa-play"></i>
+                                        <span>PLAY NOW</span>
+                                    </a>
+                                    <button onclick="copyToClipboard('${code}', event)" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 px-8 rounded-full transition-all flex items-center justify-center gap-3 w-full md:w-auto">
+                                        <span class="font-mono">${code}</span>
                                         <i class="fa-regular fa-copy"></i>
                                     </button>
                                 </div>
@@ -868,21 +801,27 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="lg:col-span-2 space-y-8">
+                            
+                            <!-- Chart Container -->
+                            <div id="chart-container" class="hidden bg-fn-card border border-slate-800 p-6 rounded-2xl shadow-lg">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-xl font-display font-bold text-white flex items-center gap-2">
+                                        <i class="fa-solid fa-chart-area text-yellow-400"></i> Player Activity
+                                    </h3>
+                                    <span class="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">Last 24 Hours</span>
+                                </div>
+                                <div class="h-72 w-full relative">
+                                    <canvas id="ccuChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Description -->
                             <div class="bg-fn-card border border-slate-800 p-6 rounded-2xl">
                                 <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
                                     <i class="fa-solid fa-circle-info text-blue-500"></i> About
                                 </h3>
                                 ${tagline ? `<p class="text-lg text-white font-medium mb-4 italic border-l-4 border-yellow-400 pl-4 py-1 bg-slate-900/50 rounded-r-lg">${tagline}</p>` : ''}
                                 <p class="text-slate-400 leading-relaxed whitespace-pre-line">${intro}</p>
-                            </div>
-                            
-                            <div id="chart-container" class="hidden bg-fn-card border border-slate-800 p-6 rounded-2xl">
-                                <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
-                                    <i class="fa-solid fa-chart-line text-green-400"></i> 24h Player Activity
-                                </h3>
-                                <div class="h-64 w-full">
-                                    <canvas id="ccuChart"></canvas>
-                                </div>
                             </div>
 
                             ${tags.length > 0 ? `
@@ -900,8 +839,12 @@
                                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                                     <span class="text-slate-400 text-sm">Live Players</span>
                                     <span id="live-ccu-display" class="text-white font-bold font-mono flex items-center gap-2">
-                                        <span class="w-2 h-2 bg-slate-600 rounded-full"></span>
-                                        Loading...
+                                        <!-- Fixed Green Dot -->
+                                        <span class="relative flex h-2.5 w-2.5 mr-2">
+                                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                        </span>
+                                        <span id="live-val">Loading...</span>
                                     </span>
                                 </div>
                                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -916,10 +859,13 @@
                                     <span class="text-slate-400 text-sm">Last Updated</span>
                                     <span class="text-white font-bold text-sm">${updateDate}</span>
                                 </div>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-400 text-sm">Age Rating</span>
-                                    <span class="bg-slate-700 px-2 py-0.5 rounded text-xs font-bold text-white">${islandData.ageRating || 'E'}</span>
+                                ${ratingsHtml ? `
+                                <div class="pt-2 border-t border-slate-800">
+                                    <div class="flex flex-wrap gap-2 justify-end">
+                                        ${ratingsHtml}
+                                    </div>
                                 </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -932,7 +878,7 @@
             const islands = data.publishedIslands || [];
             const banner = creator.images?.banner || 'https://via.placeholder.com/1920x1080/151A23/ffffff?text=No+Banner';
             const avatar = creator.images?.avatar || 'https://via.placeholder.com/150/151A23/ffffff?text=?';
-            const displayName = creator.displayName || 'Unknown Creator';
+            const displayName = creator.displayName || ' Creator';
             const followers = formatNumber(creator.followerCount);
             
             const socials = creator.social || {};
@@ -1087,7 +1033,9 @@
         }
 
         async function checkAndSchedule() {
-            await runSecurityChecks();
+            // Trigger Global Stats Fetch immediately
+            fetchGlobalStats();
+            
             handleRouting(); 
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -1097,14 +1045,16 @@
                 let lastFetch = lastFetchStr ? parseInt(lastFetchStr) : 0;
                 let timeElapsed = now - lastFetch;
                 const remaining = REFRESH_INTERVAL_MS - timeElapsed; 
+                
+                // Update "Updated X mins ago" text every second
+                updateLastUpdatedTime(lastFetch);
+                
                 if (remaining <= 0) fetchHomeData(false); 
-                else updateTimerDisplay(remaining);
             }, 1000);
             const now = Date.now();
             const lastFetchStr = localStorage.getItem(STORAGE_KEY_TIMESTAMP);
             let lastFetch = lastFetchStr ? parseInt(lastFetchStr) : 0;
-            let timeElapsed = now - lastFetch;
-            updateTimerDisplay(Math.max(0, REFRESH_INTERVAL_MS - timeElapsed));
+            updateLastUpdatedTime(lastFetch);
         }
 
         window.addEventListener('DOMContentLoaded', checkAndSchedule);
