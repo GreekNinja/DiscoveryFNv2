@@ -115,12 +115,7 @@
 
                 <!-- Global Stats -->
                 <div class="hidden md:flex items-center gap-3">
-                    <!-- Version Badge -->
-                    <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 shadow-inner" title="Game Version">
-                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">VER <span id="game-version" class="text-yellow-400 ml-1">--.--</span></span>
-                    </div>
-                    
-                    <!-- Player Count -->
+                    <!-- Player Count (Version Removed) -->
                     <div class="flex items-center gap-2 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700 shadow-inner min-w-[140px] justify-center">
                         <span class="relative flex h-2.5 w-2.5">
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -133,7 +128,7 @@
                     </div>
                 </div>
 
-                <!-- Controls (Cleaned up) -->
+                <!-- Controls -->
                 <div class="flex items-center gap-4 w-full md:w-auto justify-end">
                     <!-- Last Updated Info -->
                     <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/50 px-3 py-1.5 rounded-lg border border-slate-800">
@@ -240,8 +235,13 @@
             setTimeout(() => { alert.classList.add('opacity-0', 'translate-y-4'); setTimeout(() => alert.remove(), 300); }, duration);
         }
 
+        // --- Anti-DevTools (Passive) ---
+        document.addEventListener('keydown', function(e) {
+            if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || (e.ctrlKey && e.keyCode === 85)) e.preventDefault();
+        });
+
         // --- Configuration ---
-        const NEXT_DATA_API = "https://fnzone.es/_next/data/uia3PTQJwe47bgy4hnG2c/en";
+        const NEXT_DATA_API = "https://fnzone.es/_next/data/14Yy3iXuTKygYhqGowyiF/en";
         const BACKEND_API = "https://fnzone.es/api/backend/v2";
         const GLOBAL_STATS_API = "https://fnzone.es/api/backend/v1/player-count/live";
         const METRICS_API_BASE = "https://api.fortnite.com/ecosystem/v1/islands";
@@ -258,8 +258,8 @@
         }
         
         const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
-        const STORAGE_KEY_DATA = 'fn_discovery_data_v20';
-        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v20';
+        const STORAGE_KEY_DATA = 'fn_discovery_data_v24';
+        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v24';
 
         let timerInterval;
         let currentView = 'home'; 
@@ -270,14 +270,6 @@
         window.cachedSurfaces = [];
         
         let currentGlobalPlayers = 0;
-
-        // --- Sample Data ---
-        const SAMPLE_DATA = {
-            "pageProps": {
-                "discoveryData": [],
-                "searchSurfaces": []
-            }
-        };
 
         // --- Helper Functions ---
         function formatCCU(num) {
@@ -303,13 +295,19 @@
         }
 
         function getSafeString(val) {
+            if (val === null || val === undefined) return '';
             if (typeof val === 'string') return val;
-            if (val && typeof val === 'object') {
-                if (val.en) return val.en;
-                const keys = Object.keys(val);
-                if (keys.length > 0) return val[keys[0]];
+            
+            if (typeof val === 'object') {
+                if (val.en && typeof val.en === 'string') return val.en;
+                const values = Object.values(val);
+                for(const v of values) {
+                    if (typeof v === 'string' && v.trim() !== '') return v;
+                }
+                return '';
             }
-            return '';
+            
+            return String(val);
         }
 
         function copyToClipboard(text, event) {
@@ -499,14 +497,10 @@
         async function fetchGlobalStats() {
             const data = await performFetch(GLOBAL_STATS_API);
             const elCount = document.getElementById('global-player-count');
-            const elVer = document.getElementById('game-version');
-
-            if(data) {
-                 if (data.playingNow && elCount) {
-                     const currentVal = parseInt(elCount.innerText.replace(/,/g, '')) || 0;
-                     animateValue(elCount, currentVal, data.playingNow, 1500);
-                 }
-                 if (data.version && elVer) elVer.innerText = data.version;
+            
+            if(data && data.playingNow && elCount) {
+                 const currentVal = parseInt(elCount.innerText.replace(/,/g, '')) || 0;
+                 animateValue(elCount, currentVal, data.playingNow, 1500);
             }
         }
 
@@ -529,14 +523,6 @@
                 if (liveValDisplay && validPoints.length > 0) {
                      const lastValue = validPoints[validPoints.length - 1].value;
                      const startValue = parseInt(liveValDisplay.innerText.replace(/,/g, '')) || 0;
-                     
-                     // Ensure green dot is present
-                     if (liveDisplay) {
-                         const dot = liveDisplay.querySelector('.relative.flex');
-                         if(!dot) {
-                             // Rebuild html if needed, but usually just update number
-                         }
-                     }
                      
                      animateValue(liveValDisplay, startValue, lastValue, 1000);
                 }
@@ -589,11 +575,10 @@
                                     padding: 12,
                                     callbacks: {
                                         title: function(context) {
-                                            // Correct Time parsing using parsed.x (timestamp)
+                                            // Use parsed.x (timestamp number) directly to avoid Invalid Date issues
                                             const timestamp = context[0].parsed.x;
-                                            if (!timestamp) return ' Time';
+                                            if (!timestamp) return 'Unknown Time';
                                             const date = new Date(timestamp);
-                                            // Return formatted time e.g., 14:30
                                             return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                                         },
                                         label: (c) => 'Players: ' + formatNumber(c.parsed.y)
@@ -645,7 +630,7 @@
                         <div>
                             <h3 class="font-display font-bold text-lg leading-tight mb-1.5 text-white group-hover:text-yellow-400 transition-colors line-clamp-1" title="${title}">${title}</h3>
                             <!-- Creator name is now just text, clicking it triggers the card action (viewIsland) -->
-                            ${creator ? `<div class="flex items-center gap-1 text-slate-400 text-xs mb-3"><i class="fa-solid fa-user-astronaut text-slate-600"></i><span class="font-medium">${creator}</span></div>` : '<div class="mb-3"></div>'}
+                            ${creator ? `<div class="flex items-center gap-1 text-slate-400 text-xs mb-3 hover:text-yellow-400 cursor-pointer transition-colors w-fit" onclick="event.stopPropagation(); viewCreator('${island.creatorSlug}', true);"><i class="fa-solid fa-user-astronaut text-slate-600"></i><span class="font-medium">${creator}</span></div>` : '<div class="mb-3"></div>'}
                         </div>
                     </div>
                 </div>
@@ -697,9 +682,11 @@
         function renderPanel(panel) {
             const cardsData = panel.firstPage || panel.links || [];
             if (cardsData.length === 0) return '';
+            
             const title = getSafeString(panel.panelDisplayName || panel.panelName);
             const subtitle = getSafeString(panel.panelSubtitle);
             const cardsHtml = cardsData.map(createCard).join('');
+            
             return `
                 <section class="animate-fade-in">
                     <div class="flex items-end gap-4 mb-6 border-b border-slate-800 pb-4">
@@ -719,10 +706,10 @@
         }
 
         function renderIslandDetails(islandData) {
-            const title = getSafeString(islandData.islandTitle) || ' Island';
-            const code = islandData.mnemonic || ' Code';
+            const title = getSafeString(islandData.islandTitle) || 'Unknown Island';
+            const code = islandData.mnemonic || 'Unknown Code';
             const image = getSafeString(islandData.islandImage) || 'https://via.placeholder.com/1280x720/151A23/ffffff?text=No+Image';
-            const creator = islandData.creatorSlug || ' Creator';
+            const creator = islandData.creatorSlug || 'Unknown Creator';
             const accountId = islandData.accountId || ''; 
             const intro = getSafeString(islandData.localizedIntroduction) || 'No description available.';
             const tagline = getSafeString(islandData.localizedTagline) || '';
@@ -774,7 +761,7 @@
                             <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                                 <div>
                                     <div class="flex flex-wrap gap-2 mb-3">
-                                        ${islandData.isUEFN ? '<span class="bg-white text-black px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wide">UEFN</span>' : ''}
+                                        ${isUEFN ? '<span class="bg-white text-black px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wide">UEFN</span>' : ''}
                                         ${xpBadge}
                                         ${version ? `<span class="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${version}</span>` : ''}
                                     </div>
@@ -878,7 +865,7 @@
             const islands = data.publishedIslands || [];
             const banner = creator.images?.banner || 'https://via.placeholder.com/1920x1080/151A23/ffffff?text=No+Banner';
             const avatar = creator.images?.avatar || 'https://via.placeholder.com/150/151A23/ffffff?text=?';
-            const displayName = creator.displayName || ' Creator';
+            const displayName = creator.displayName || 'Unknown Creator';
             const followers = formatNumber(creator.followerCount);
             
             const socials = creator.social || {};
@@ -937,7 +924,7 @@
                 const props = data.pageProps || {};
                 const surfaces = props.searchSurfaces || window.cachedSurfaces || [];
                 if (surfaces.length > 0) container.innerHTML += renderCategories(surfaces);
-                const panels = props.discoveryData || props.surfacePanels;
+                const panels = props.discoveryData || props.displayPanels || props.surfacePanels;
                 if (!panels || panels.length === 0) container.innerHTML += '<div class="text-center text-2xl text-slate-500 mt-20 font-display">No maps found.</div>';
                 else container.innerHTML += panels.map(renderPanel).join('');
             } else if (currentView === 'details') {
