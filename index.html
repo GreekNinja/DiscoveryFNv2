@@ -185,29 +185,81 @@
     <div id="alert-container"></div>
 
     <script>
-        // --- Animation Utilities ---
+        // --- Constants ---
+        const NEXT_DATA_API = "https://fnzone.es/_next/data/xm0qFQ13CLl_4wc65Zvgm/en";
+        const BACKEND_API = "https://fnzone.es/api/backend/v2";
+        const GLOBAL_STATS_API = "https://fnzone.es/api/backend/v1/player-count/live";
+        const METRICS_API_BASE = "https://api.fortnite.com/ecosystem/v1/islands";
+        const HOME_ENDPOINT = "/discover.json";
+        
+        const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
+        const STORAGE_KEY_DATA = 'fn_discovery_data_v33';
+        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v33';
+
+        // --- State ---
+        let timerInterval;
+        let currentView = 'home'; 
+        let currentCategoryName = '';
+        let currentIslandCode = '';
+        let currentCreatorId = '';
+        let chartInstance = null;
+        window.cachedSurfaces = [];
+        let currentGlobalPlayers = 0;
+
+        const SAMPLE_DATA = { "pageProps": { "discoveryData": [], "searchSurfaces": [] } };
+
+        // --- Helper Functions ---
+
+        function getProxies(targetUrl) {
+            const encoded = encodeURIComponent(targetUrl);
+            return [
+                `https://corsproxy.io/?${encoded}`,
+                `https://api.allorigins.win/raw?url=${encoded}`,
+                `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
+                targetUrl
+            ];
+        }
+
+        function setStatus(type) {
+            const el = document.getElementById('status-indicator');
+            if (!el) return;
+            const dotPing = el.querySelector('.animate-ping');
+            const dot = el.querySelector('.relative.inline-flex');
+            
+            if (dotPing) dotPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75';
+            if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5';
+            
+            if (type === 'loading') {
+                if(dotPing) dotPing.classList.add('bg-yellow-400');
+                if(dot) dot.classList.add('bg-yellow-500');
+            } else if (type === 'success') {
+                if(dotPing) dotPing.classList.add('bg-green-400');
+                if(dot) dot.classList.add('bg-green-500');
+            } else if (type === 'cached') {
+                if(dotPing) dotPing.classList.add('bg-blue-400');
+                if(dot) dot.classList.add('bg-blue-500');
+            } else { 
+                if(dotPing) dotPing.classList.add('bg-red-400');
+                if(dot) dot.classList.add('bg-red-500');
+            }
+        }
+
         function animateValue(obj, start, end, duration) {
             if (!obj) return;
-            // Ensure inputs are numbers
             start = parseInt(String(start).replace(/,/g, '')) || 0;
             end = parseInt(String(end).replace(/,/g, '')) || 0;
-            
             if (start === end) {
                 obj.innerHTML = new Intl.NumberFormat('en-US').format(end);
                 return;
             }
-
             let startTimestamp = null;
             const step = (timestamp) => {
                 if (!startTimestamp) startTimestamp = timestamp;
                 const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                // Easing function for smooth effect
                 const easeOutQuad = (t) => t * (2 - t);
                 const easeProgress = easeOutQuad(progress);
-                
                 const current = Math.floor(easeProgress * (end - start) + start);
                 obj.innerHTML = new Intl.NumberFormat('en-US').format(current);
-                
                 if (progress < 1) {
                     window.requestAnimationFrame(step);
                 } else {
@@ -217,9 +269,9 @@
             window.requestAnimationFrame(step);
         }
 
-        // --- Custom Alert System ---
         function showAlert(message, type = 'success', duration = 3000) {
             const container = document.getElementById('alert-container');
+            if (!container) return;
             const styles = {
                 success: { bg: 'bg-slate-800', border: 'border-green-500', icon: 'fa-circle-check', text: 'text-green-400' },
                 error: { bg: 'bg-red-900/90', border: 'border-red-500', icon: 'fa-circle-xmark', text: 'text-white' },
@@ -235,43 +287,6 @@
             setTimeout(() => { alert.classList.add('opacity-0', 'translate-y-4'); setTimeout(() => alert.remove(), 300); }, duration);
         }
 
-        // --- Anti-DevTools (Passive) ---
-        document.addEventListener('keydown', function(e) {
-            if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || (e.ctrlKey && e.keyCode === 85)) e.preventDefault();
-        });
-
-        // --- Configuration ---
-        const NEXT_DATA_API = "https://fnzone.es/_next/data/xm0qFQ13CLl_4wc65Zvgm/en";
-        const BACKEND_API = "https://fnzone.es/api/backend/v2";
-        const GLOBAL_STATS_API = "https://fnzone.es/api/backend/v1/player-count/live";
-        const METRICS_API_BASE = "https://api.fortnite.com/ecosystem/v1/islands";
-        const HOME_ENDPOINT = "/discover.json";
-        
-        function getProxies(targetUrl) {
-            const encoded = encodeURIComponent(targetUrl);
-            return [
-                `https://corsproxy.io/?${encoded}`,
-                `https://api.allorigins.win/raw?url=${encoded}`,
-                `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
-                targetUrl
-            ];
-        }
-        
-        const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
-        const STORAGE_KEY_DATA = 'fn_discovery_data_v27';
-        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v27';
-
-        let timerInterval;
-        let currentView = 'home'; 
-        let currentCategoryName = '';
-        let currentIslandCode = '';
-        let currentCreatorId = '';
-        let chartInstance = null;
-        window.cachedSurfaces = [];
-        
-        let currentGlobalPlayers = 0;
-
-        // --- Helper Functions ---
         function formatCCU(num) {
             if (!num) return '0';
             if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -290,29 +305,20 @@
 
         function sanitizeTag(tag) {
             const lower = tag.toLowerCase().trim();
-            const map = { 'free for all': 'ffa', 'prop hunt': 'prophunt', 'zone wars': 'zonewars', 'box fight': 'boxfight', 'death run': 'deathrun', 'edit course': 'editcourse', 'hide and seek': 'hideandseek', 'open world': 'openworld', 'team deathmatch': 'teamdeathmatch', 'battle royale': 'battleroyale', 'gun game': 'gungame' };
-            return map[lower] || lower.replace(/\s+/g, '');
+            return lower.replace(/\s+/g, '');
         }
 
-        // UPDATED: getSafeString that strictly returns a non-empty string or ''
         function getSafeString(val) {
             if (val === null || val === undefined) return '';
             if (typeof val === 'string') return val;
-            
             if (typeof val === 'object') {
-                // 1. Try english specific key
                 if (val.en && typeof val.en === 'string') return val.en;
-                
-                // 2. Try finding ANY string value in object
                 const values = Object.values(val);
                 for(const v of values) {
                     if (typeof v === 'string' && v.trim() !== '') return v;
                 }
-                
-                // If we have an object but no valid string, return empty to avoid [object Object]
                 return '';
             }
-            
             return String(val);
         }
 
@@ -331,27 +337,16 @@
             document.body.removeChild(textArea);
         }
 
-        // --- Updated Time Logic (Just X mins ago) ---
         function updateLastUpdatedTime(timestamp) {
             const el = document.getElementById('last-updated-text');
             if (!el) return;
-            
-            if (!timestamp) {
-                el.innerText = "";
-                return;
-            }
-
+            if (!timestamp) { el.innerText = ""; return; }
             const now = Date.now();
             const diffMs = now - parseInt(timestamp);
             const diffMins = Math.floor(diffMs / 60000);
-
-            if (diffMins < 1) {
-                el.innerText = "Just now";
-            } else if (diffMins === 1) {
-                el.innerText = "1 min ago";
-            } else {
-                el.innerText = `${diffMins} mins ago`;
-            }
+            if (diffMins < 1) el.innerText = "Just now";
+            else if (diffMins === 1) el.innerText = "1 min ago";
+            else el.innerText = `${diffMins} mins ago`;
         }
 
         function updateURL(path, params = {}) {
@@ -365,48 +360,6 @@
             }
         }
 
-        function resetToHome(pushState = true) {
-            if (pushState) updateURL('/discovery');
-            currentView = 'home';
-            const savedDataStr = localStorage.getItem(STORAGE_KEY_DATA);
-            if (savedDataStr) {
-                renderApp(JSON.parse(savedDataStr));
-            } else {
-                fetchHomeData(false); 
-            }
-        }
-
-        function goBack() {
-             if (currentView === 'creator') {
-                if (currentIslandCode) updateURL('/island', { code: currentIslandCode });
-                else resetToHome(true);
-            }
-            else if (currentView === 'details') {
-                if (currentCategoryName) {
-                    updateURL('/creative', { tag: currentCategoryName }); 
-                } else {
-                    resetToHome(true);
-                }
-            } else {
-                resetToHome(true);
-            }
-        }
-
-        function forceRefresh() {
-             if (currentView === 'home') {
-                localStorage.removeItem(STORAGE_KEY_TIMESTAMP);
-                fetchHomeData(false);
-            } else if (currentView === 'category' && currentCategoryName) {
-                fetchCategoryData(currentCategoryName, false);
-            } else if (currentView === 'details' && currentIslandCode) {
-                viewIsland(currentIslandCode, false);
-            } else if (currentView === 'creator' && currentCreatorId) {
-                viewCreator(currentCreatorId, false);
-            }
-             fetchGlobalStats();
-        }
-
-        // --- Error Pages ---
         function renderErrorPage(title, message, isOffline = false) {
             const container = document.getElementById('main-container');
             container.innerHTML = `
@@ -425,51 +378,7 @@
             `;
         }
 
-        // --- Routing & API ---
-
-        function handleRouting() {
-            let hash = window.location.hash.substring(1);
-            if (!hash || hash === '/') {
-                 hash = '/discovery';
-            }
-
-            if (!navigator.onLine) {
-                renderErrorPage("No Internet Connection", "Please check your network settings and try again.", true);
-                return;
-            }
-
-            const [path, search] = hash.split('?');
-            const params = new URLSearchParams(search);
-
-            if (path === '/discovery') {
-                if (currentView !== 'home') fetchHomeData(false); 
-            } 
-            else if (path === '/island') {
-                const code = params.get('code');
-                if (code) viewIsland(code, false); 
-                else resetToHome();
-            } 
-            else if (path === '/creator') {
-                const id = params.get('name'); 
-                if (id) viewCreator(id, false);
-                else resetToHome();
-            } 
-            else if (path === '/creative') {
-                const tag = params.get('tag');
-                if (tag) fetchCategoryData(tag, false);
-                else resetToHome();
-            } 
-            else if (path === '/error') {
-                renderErrorPage("Page Not Found", "The requested resource could not be found.");
-            }
-            else {
-                 if (currentView !== 'home') resetToHome(true);
-            }
-        }
-
-        window.addEventListener('hashchange', handleRouting);
-        window.addEventListener('online', () => { showAlert('Back Online!', 'success'); handleRouting(); });
-        window.addEventListener('offline', () => { showAlert('Connection Lost', 'error'); renderErrorPage("No Internet Connection", "You are currently offline.", true); });
+        // --- API Functions ---
 
         async function tryFetch(url) {
             try {
@@ -499,7 +408,6 @@
             }
         }
 
-        // --- Fetch Global Player Count ---
         async function fetchGlobalStats() {
             const data = await performFetch(GLOBAL_STATS_API);
             const elCount = document.getElementById('global-player-count');
@@ -512,12 +420,9 @@
             }
         }
 
-        // --- Chart Logic ---
-
         async function loadIslandMetrics(code) {
             const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             const metricsUrl = `${METRICS_API_BASE}/${code}/metrics/minute/peak-ccu?from=${fromDate}`;
-            
             const data = await performFetch(metricsUrl);
             
             const canvas = document.getElementById('ccuChart');
@@ -526,27 +431,20 @@
             
             if (data && data.intervals && data.intervals.length > 0) {
                 const validPoints = data.intervals.filter(p => p.value !== null);
-                
-                // Animate Live Player Count
                 if (liveValDisplay && validPoints.length > 0) {
                      const lastValue = validPoints[validPoints.length - 1].value;
                      const startValue = parseInt(liveValDisplay.innerText.replace(/,/g, '')) || 0;
-                     
                      animateValue(liveValDisplay, startValue, lastValue, 1000);
                 }
-
                 if (canvas) {
                     const ctx = canvas.getContext('2d');
                     const labels = validPoints.map(p => p.timestamp);
                     const values = validPoints.map(p => p.value);
-
                     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
                     gradient.addColorStop(0, 'rgba(250, 204, 21, 0.5)'); 
                     gradient.addColorStop(1, 'rgba(250, 204, 21, 0.0)');
 
-                    if (chartInstance) {
-                        chartInstance.destroy();
-                    }
+                    if (chartInstance) chartInstance.destroy();
 
                     chartInstance = new Chart(ctx, {
                         type: 'line',
@@ -612,7 +510,7 @@
             }
         }
 
-        // --- Rendering ---
+        // --- Render Functions ---
 
         function createCard(island) {
             const title = getSafeString(island.islandTitle || island.title) || ' Title';
@@ -622,7 +520,6 @@
             const ccu = formatCCU(island.globalCCU);
             const creator = island.creatorSlug || '';
 
-            // Remove code display from card footer
             return `
                 <div class="bg-fn-card rounded-2xl overflow-hidden card-hover group relative border border-slate-800 flex flex-col h-full cursor-pointer" onclick="viewIsland('${code}', true)">
                     <div class="relative aspect-video overflow-hidden bg-slate-900">
@@ -636,7 +533,6 @@
                     <div class="p-4 flex-1 flex flex-col justify-between relative z-10">
                         <div>
                             <h3 class="font-display font-bold text-lg leading-tight mb-1.5 text-white group-hover:text-yellow-400 transition-colors line-clamp-1" title="${title}">${title}</h3>
-                            <!-- Creator name is now just text, clicking it triggers the card action (viewIsland) -->
                             ${creator ? `<div class="flex items-center gap-1 text-slate-400 text-xs mb-3 hover:text-yellow-400 cursor-pointer transition-colors w-fit" onclick="event.stopPropagation(); viewCreator('${island.creatorSlug}', true);"><i class="fa-solid fa-user-astronaut text-slate-600"></i><span class="font-medium">${creator}</span></div>` : '<div class="mb-3"></div>'}
                         </div>
                     </div>
@@ -724,10 +620,8 @@
             const updateDate = formatDate(islandData.lastUpdated);
             const maxPlayers = islandData.maxPlayers || '-';
 
-            // Custom Launcher URI
             const launchUrl = `com.epicgames.launcher://apps/fn%3A4fe75bbc5a674f4f9b356b5c90567da5%3AFortnite?action=launch&silent=true&arg=-IslandOverride%3D${code}`;
 
-            // XP Badge Logic
             const dynamicXp = islandData.dynamicXp || '';
             const isUEFN = islandData.isUEFN || false;
             const ratings = islandData.allRatings || [];
@@ -797,8 +691,6 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="lg:col-span-2 space-y-8">
-                            
-                            <!-- Chart Container -->
                             <div id="chart-container" class="hidden bg-fn-card border border-slate-800 p-6 rounded-2xl shadow-lg">
                                 <div class="flex items-center justify-between mb-4">
                                     <h3 class="text-xl font-display font-bold text-white flex items-center gap-2">
@@ -811,7 +703,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Description -->
                             <div class="bg-fn-card border border-slate-800 p-6 rounded-2xl">
                                 <h3 class="text-xl font-display font-bold text-white mb-4 flex items-center gap-2">
                                     <i class="fa-solid fa-circle-info text-blue-500"></i> About
@@ -835,7 +726,6 @@
                                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                                     <span class="text-slate-400 text-sm">Live Players</span>
                                     <span id="live-ccu-display" class="text-white font-bold font-mono flex items-center gap-2">
-                                        <!-- Fixed Green Dot -->
                                         <span class="relative flex h-2.5 w-2.5 mr-2">
                                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                           <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
@@ -945,108 +835,174 @@
             }
         }
 
-        function setStatus(type) {
-            const el = document.getElementById('status-indicator');
-            const dotPing = el.querySelector('.animate-ping');
-            const dot = el.querySelector('.relative.inline-flex');
-            
-            dotPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75';
-            dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5';
-            
-            if (type === 'loading') {
-                dotPing.classList.add('bg-yellow-400');
-                dot.classList.add('bg-yellow-500');
-                el.className = "text-xs font-bold px-2 py-2 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 flex items-center justify-center shadow-sm w-8 h-8 transition-all";
-            } else if (type === 'success') {
-                dotPing.classList.add('bg-green-400');
-                dot.classList.add('bg-green-500');
-                el.className = "text-xs font-bold px-2 py-2 rounded-full border border-green-500/30 bg-green-500/10 text-green-400 flex items-center justify-center shadow-sm w-8 h-8 transition-all";
-            } else if (type === 'cached') {
-                dotPing.classList.add('bg-blue-400');
-                dot.classList.add('bg-blue-500');
-                el.className = "text-xs font-bold px-2 py-2 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 flex items-center justify-center shadow-sm w-8 h-8 transition-all";
-            } else { 
-                dotPing.classList.add('bg-red-400');
-                dot.classList.add('bg-red-500');
-                el.className = "text-xs font-bold px-2 py-2 rounded-full border border-red-500/30 bg-red-500/10 text-red-400 flex items-center justify-center shadow-sm w-8 h-8 transition-all";
-            }
+        function fetchHomeData(pushState = true) {
+            return new Promise(async (resolve) => {
+                currentView = 'home';
+                currentCategoryName = '';
+                currentIslandCode = '';
+                if (pushState) updateURL('/discovery');
+                const fullUrl = NEXT_DATA_API + HOME_ENDPOINT;
+                const data = await performFetch(fullUrl);
+                if (data) {
+                    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(data));
+                    const now = Date.now();
+                    localStorage.setItem(STORAGE_KEY_TIMESTAMP, now.toString());
+                    updateLastUpdatedTime(now);
+                    setStatus('success');
+                    renderApp(data);
+                    resolve(now);
+                } else {
+                    if (!localStorage.getItem(STORAGE_KEY_DATA)) renderApp(SAMPLE_DATA);
+                    resolve(Date.now());
+                }
+            });
         }
 
-        async function fetchHomeData(pushState = true) {
-            currentView = 'home';
-            currentCategoryName = '';
-            currentIslandCode = '';
+        function fetchCategoryData(surfaceName, pushState = true) {
+            return new Promise(async (resolve) => {
+                currentView = 'category';
+                currentCategoryName = surfaceName;
+                currentIslandCode = '';
+                if (pushState) updateURL('/creative', { tag: surfaceName });
+                const fullUrl = `${NEXT_DATA_API}/discover/${surfaceName}.json?surfaceName=${surfaceName}`;
+                document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading ${surfaceName}...</p></div>`;
+                const data = await performFetch(fullUrl);
+                if (data) { setStatus('success'); renderApp(data); }
+                else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load category.</div>'; }
+                resolve();
+            });
+        }
+
+        function viewIsland(code, pushState = true) {
+            return new Promise(async (resolve) => {
+                currentView = 'details';
+                currentIslandCode = code;
+                if (pushState) updateURL('/island', { code: code });
+                const fullUrl = `${NEXT_DATA_API}/creative/${code}.json?islandCode=${code}`;
+                document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading Island Details...</p></div>`;
+                const data = await performFetch(fullUrl);
+                if (data) { setStatus('success'); renderApp(data); }
+                else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load island details.</div>'; }
+                resolve();
+            });
+        }
+
+        function viewCreator(accountId, pushState = true) {
+            return new Promise(async (resolve) => {
+                if(!accountId) return;
+                currentView = 'creator';
+                currentCreatorId = accountId;
+                if (pushState) updateURL('/creator', { name: accountId });
+                const fullUrl = `${BACKEND_API}/creator/${accountId}`;
+                document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading Creator Profile...</p></div>`;
+                const data = await performFetch(fullUrl);
+                if (data) { setStatus('success'); renderApp(data); }
+                else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load creator.</div>'; }
+                resolve();
+            });
+        }
+
+        function resetToHome(pushState = true) {
             if (pushState) updateURL('/discovery');
-            const fullUrl = NEXT_DATA_API + HOME_ENDPOINT;
-            const data = await performFetch(fullUrl);
-            if (data) {
-                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(data));
-                const now = Date.now();
-                localStorage.setItem(STORAGE_KEY_TIMESTAMP, now.toString());
-                updateLastUpdatedTime(now);
-                setStatus('success');
-                renderApp(data);
-                return now;
+            currentView = 'home';
+            const savedDataStr = localStorage.getItem(STORAGE_KEY_DATA);
+            if (savedDataStr) {
+                renderApp(JSON.parse(savedDataStr));
             } else {
-                if (!localStorage.getItem(STORAGE_KEY_DATA)) renderApp(SAMPLE_DATA);
-                return Date.now(); 
+                fetchHomeData(false); 
             }
         }
 
-        async function fetchCategoryData(surfaceName, pushState = true) {
-            currentView = 'category';
-            currentCategoryName = surfaceName;
-            currentIslandCode = '';
-            if (pushState) updateURL('/creative', { tag: surfaceName });
-            const fullUrl = `${NEXT_DATA_API}/discover/${surfaceName}.json?surfaceName=${surfaceName}`;
-            document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading ${surfaceName}...</p></div>`;
-            const data = await performFetch(fullUrl);
-            if (data) { setStatus('success'); renderApp(data); }
-            else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load category.</div>'; }
+        function goBack() {
+             if (currentView === 'creator') {
+                if (currentIslandCode) updateURL('/island', { code: currentIslandCode });
+                else resetToHome(true);
+            }
+            else if (currentView === 'details') {
+                if (currentCategoryName) {
+                    updateURL('/creative', { tag: currentCategoryName }); 
+                } else {
+                    resetToHome(true);
+                }
+            } else {
+                resetToHome(true);
+            }
         }
 
-        async function viewIsland(code, pushState = true) {
-            currentView = 'details';
-            currentIslandCode = code;
-            if (pushState) updateURL('/island', { code: code });
-            const fullUrl = `${NEXT_DATA_API}/creative/${code}.json?islandCode=${code}`;
-            document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading Island Details...</p></div>`;
-            const data = await performFetch(fullUrl);
-            if (data) { setStatus('success'); renderApp(data); }
-            else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load island details.</div>'; }
+        function forceRefresh() {
+             if (currentView === 'home') {
+                localStorage.removeItem(STORAGE_KEY_TIMESTAMP);
+                fetchHomeData(false);
+            } else if (currentView === 'category' && currentCategoryName) {
+                fetchCategoryData(currentCategoryName, false);
+            } else if (currentView === 'details' && currentIslandCode) {
+                viewIsland(currentIslandCode, false);
+            } else if (currentView === 'creator' && currentCreatorId) {
+                viewCreator(currentCreatorId, false);
+            }
+             fetchGlobalStats();
         }
 
-        async function viewCreator(accountId, pushState = true) {
-            if(!accountId) return;
-            currentView = 'creator';
-            currentCreatorId = accountId;
-            if (pushState) updateURL('/creator', { name: accountId });
-            const fullUrl = `${BACKEND_API}/creator/${accountId}`;
-            document.getElementById('main-container').innerHTML = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 animate-pulse"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-slate-600"></i><p>Loading Creator Profile...</p></div>`;
-            const data = await performFetch(fullUrl);
-            if (data) { setStatus('success'); renderApp(data); }
-            else { setStatus('error'); document.getElementById('main-container').innerHTML = '<div class="text-center text-red-400 mt-20">Failed to load creator.</div>'; }
+        // --- Logic & Initialization (Defined LAST) ---
+
+        function handleRouting() {
+            let hash = window.location.hash.substring(1);
+            if (!hash || hash === '/') hash = '/discovery';
+
+            if (!navigator.onLine) {
+                renderErrorPage("No Internet Connection", "Please check your network settings and try again.", true);
+                return;
+            }
+
+            const [path, search] = hash.split('?');
+            const params = new URLSearchParams(search);
+
+            if (path === '/discovery') {
+                if (currentView !== 'home') fetchHomeData(false); 
+            } 
+            else if (path === '/island') {
+                const code = params.get('code');
+                if (code) viewIsland(code, false); 
+                else resetToHome();
+            } 
+            else if (path === '/creator') {
+                const id = params.get('name'); 
+                if (id) viewCreator(id, false);
+                else resetToHome();
+            } 
+            else if (path === '/creative') {
+                const tag = params.get('tag');
+                if (tag) fetchCategoryData(tag, false);
+                else resetToHome();
+            } 
+            else if (path === '/error') {
+                renderErrorPage("Page Not Found", "The requested resource could not be found.");
+            }
+            else {
+                 if (currentView !== 'home') resetToHome(true);
+            }
         }
 
         async function checkAndSchedule() {
-            // Trigger Global Stats Fetch immediately
             fetchGlobalStats();
-            
             handleRouting(); 
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
-                if (currentView !== 'home') return;
                 const now = Date.now();
                 const lastFetchStr = localStorage.getItem(STORAGE_KEY_TIMESTAMP);
                 let lastFetch = lastFetchStr ? parseInt(lastFetchStr) : 0;
                 let timeElapsed = now - lastFetch;
                 const remaining = REFRESH_INTERVAL_MS - timeElapsed; 
                 
-                // Update "Updated X mins ago" text every second
-                updateLastUpdatedTime(lastFetch);
+                if (currentView === 'home') {
+                    updateLastUpdatedTime(lastFetch);
+                }
                 
-                if (remaining <= 0) fetchHomeData(false); 
+                if (remaining <= 0) {
+                    fetchHomeData(false, true); // Background refresh
+                }
             }, 1000);
+            
             const now = Date.now();
             const lastFetchStr = localStorage.getItem(STORAGE_KEY_TIMESTAMP);
             let lastFetch = lastFetchStr ? parseInt(lastFetchStr) : 0;
@@ -1054,6 +1010,10 @@
         }
 
         window.addEventListener('DOMContentLoaded', checkAndSchedule);
+        window.addEventListener('hashchange', handleRouting);
+        window.addEventListener('online', () => { showAlert('Back Online!', 'success'); handleRouting(); });
+        window.addEventListener('offline', () => { showAlert('Connection Lost', 'error'); renderErrorPage("No Internet Connection", "You are currently offline.", true); });
+
     </script>
 </body>
 </html>
