@@ -115,7 +115,7 @@
 
                 <!-- Global Stats -->
                 <div class="hidden md:flex items-center gap-3">
-                    <!-- Player Count (Version Removed) -->
+                    <!-- Player Count -->
                     <div class="flex items-center gap-2 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700 shadow-inner min-w-[140px] justify-center">
                         <span class="relative flex h-2.5 w-2.5">
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -258,8 +258,8 @@
         }
         
         const REFRESH_INTERVAL_MS = 5 * 60 * 1000; 
-        const STORAGE_KEY_DATA = 'fn_discovery_data_v24';
-        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v24';
+        const STORAGE_KEY_DATA = 'fn_discovery_data_v27';
+        const STORAGE_KEY_TIMESTAMP = 'fn_discovery_timestamp_v27';
 
         let timerInterval;
         let currentView = 'home'; 
@@ -294,16 +294,22 @@
             return map[lower] || lower.replace(/\s+/g, '');
         }
 
+        // UPDATED: getSafeString that strictly returns a non-empty string or ''
         function getSafeString(val) {
             if (val === null || val === undefined) return '';
             if (typeof val === 'string') return val;
             
             if (typeof val === 'object') {
+                // 1. Try english specific key
                 if (val.en && typeof val.en === 'string') return val.en;
+                
+                // 2. Try finding ANY string value in object
                 const values = Object.values(val);
                 for(const v of values) {
                     if (typeof v === 'string' && v.trim() !== '') return v;
                 }
+                
+                // If we have an object but no valid string, return empty to avoid [object Object]
                 return '';
             }
             
@@ -497,14 +503,16 @@
         async function fetchGlobalStats() {
             const data = await performFetch(GLOBAL_STATS_API);
             const elCount = document.getElementById('global-player-count');
-            
-            if(data && data.playingNow && elCount) {
-                 const currentVal = parseInt(elCount.innerText.replace(/,/g, '')) || 0;
-                 animateValue(elCount, currentVal, data.playingNow, 1500);
+
+            if(data) {
+                 if (data.playingNow && elCount) {
+                     const currentVal = parseInt(elCount.innerText.replace(/,/g, '')) || 0;
+                     animateValue(elCount, currentVal, data.playingNow, 1500);
+                 }
             }
         }
 
-        // --- Chart Logic (Fixed with Real Time) ---
+        // --- Chart Logic ---
 
         async function loadIslandMetrics(code) {
             const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -575,7 +583,6 @@
                                     padding: 12,
                                     callbacks: {
                                         title: function(context) {
-                                            // Use parsed.x (timestamp number) directly to avoid Invalid Date issues
                                             const timestamp = context[0].parsed.x;
                                             if (!timestamp) return 'Unknown Time';
                                             const date = new Date(timestamp);
@@ -682,11 +689,9 @@
         function renderPanel(panel) {
             const cardsData = panel.firstPage || panel.links || [];
             if (cardsData.length === 0) return '';
-            
             const title = getSafeString(panel.panelDisplayName || panel.panelName);
             const subtitle = getSafeString(panel.panelSubtitle);
             const cardsHtml = cardsData.map(createCard).join('');
-            
             return `
                 <section class="animate-fade-in">
                     <div class="flex items-end gap-4 mb-6 border-b border-slate-800 pb-4">
@@ -723,10 +728,14 @@
             const launchUrl = `com.epicgames.launcher://apps/fn%3A4fe75bbc5a674f4f9b356b5c90567da5%3AFortnite?action=launch&silent=true&arg=-IslandOverride%3D${code}`;
 
             // XP Badge Logic
+            const dynamicXp = islandData.dynamicXp || '';
+            const isUEFN = islandData.isUEFN || false;
+            const ratings = islandData.allRatings || [];
+
             let xpBadge = '';
-            if (islandData.dynamicXp === 'XP') {
+            if (dynamicXp === 'XP') {
                 xpBadge = '<span class="bg-green-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">XP ENABLED</span>';
-            } else if (islandData.dynamicXp === 'Calibrating XP' || islandData.dynamicXp === 'Calibrating') {
+            } else if (dynamicXp === 'Calibrating XP' || dynamicXp === 'Calibrating') {
                 xpBadge = '<span class="bg-yellow-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">XP CALIBRATING</span>';
             } else {
                 xpBadge = '<span class="bg-slate-600 text-slate-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">XP DISABLED</span>';
@@ -736,7 +745,7 @@
                 `<button onclick="fetchCategoryData('${sanitizeTag(tag)}', true)" class="px-3 py-1 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-yellow-400 transition-all text-xs font-bold uppercase rounded-full border border-slate-700 cursor-pointer">${tag}</button>`
             ).join('');
             
-            const ratingsHtml = (islandData.allRatings || []).map(r => {
+            const ratingsHtml = ratings.map(r => {
                 if(!r.ratingImage) return '';
                 return `<img src="${r.ratingImage}" alt="${r.ratingText}" class="h-8 object-contain" title="${r.ratingBoardText}: ${r.ratingText || ''}">`;
             }).join('');
